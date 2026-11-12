@@ -141,7 +141,7 @@ p { margin: 0; }
 .pass { position: relative; overflow: hidden; border-radius: var(--radius-lg); background: var(--color-accent); color: var(--color-on-accent); padding: var(--space-lg); isolation: isolate; }
 .pass .adire { position: absolute; inset: 0; z-index: -1; color: var(--color-pattern); width: 100%; height: 100%; }
 .pass .kicker { font-size: var(--text-sm); }
-.pass .code { font: 600 clamp(2rem, 4vw + 1rem, 2.75rem)/1 var(--font-mono); letter-spacing: 0.08em; margin: var(--space-xs) 0 var(--space-md); }
+.pass .code { font: 600 clamp(1.75rem, 1.2vw + 1.2rem, 2.25rem)/1 var(--font-mono); letter-spacing: 0.06em; margin: var(--space-xs) 0 var(--space-md); white-space: nowrap; }
 .pass .btn { background: var(--color-surface); color: var(--color-ink); }
 .pass .btn:hover { background: var(--color-paper-2); color: var(--color-ink); }
 .pass .btn-ghost { background: transparent; color: var(--color-on-accent); border-color: var(--color-accent-line); }

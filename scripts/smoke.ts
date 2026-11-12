@@ -5,6 +5,7 @@ import {
   TREASURY, ajoScore, canClaim, claimPot, createCircle, discoverCodes, feeOf, fundTestnet, getBalances, getTestUsdc,
   joinCircle, loadCircle, owes, payRound, recipientOf,
 } from '../src/ajo.ts'
+import { createProtected, discoverProtected, idOf, joinProtected, loadProtected, payProtected, payoutProtected, protectedCode } from '../src/protected.ts'
 
 const wallet = () => { const k = Keypair.random(); return { pub: k.publicKey(), secret: k.secret() } }
 const [ada, bola, chike] = [wallet(), wallet(), wallet()]
@@ -35,8 +36,8 @@ assert.equal(r.total, 20)
 assert.equal(r.fee, feeOf(20))
 c = (await loadCircle(code))!
 assert.equal(c.round, 1, 'round advances after payout')
-assert.equal((await getBalances(ada.pub))!.usdc, 120 - r.fee, 'recipient nets the pot minus the fee')
-assert.equal((await getBalances(TREASURY))!.usdc, treasuryBefore + r.fee, 'treasury receives the fee')
+assert.equal((await getBalances(ada.pub))!.usdc.toFixed(7), (120 - r.fee).toFixed(7), 'recipient nets the pot minus the fee')
+assert.equal((await getBalances(TREASURY))!.usdc.toFixed(7), (treasuryBefore + r.fee).toFixed(7), 'treasury receives the fee')
 assert.equal(ajoScore([c], bola.pub).onTime, 1)
 assert.equal(await loadCircle('ZZZZZZ'), null, 'unknown code resolves to nothing')
 
@@ -55,4 +56,24 @@ const found = await discoverCodes(chike.pub)
 assert.ok(found.includes(code) && found.includes(drawCode), 'joined circles are discovered')
 assert.ok((await discoverCodes(ada.pub)).includes(code), 'created circles are discovered')
 
-console.log(`OK: ${code} paid out ${r.total} USDC (fee ${r.fee}); draw ${drawCode} order fixed; discovery found ${found.length} circles`)
+// 4. Protected circle in the Soroban contract: deposits held, rules enforced on-chain
+assert.equal(idOf(protectedCode(12345)), 12345, 'protected code round-trips')
+const pcode = await createProtected(ada, { name: 'Protected test', you: 'Ada', amount: 5, deposit: 5, size: 3, freq: 'weekly', draw: false })
+let p = (await loadProtected(pcode))!
+assert.equal(p.name, 'Protected test')
+await joinProtected(bola, p, 'Bola')
+await joinProtected(chike, p, 'Chike')
+p = (await loadProtected(pcode))!
+assert.deepEqual(p.order, [ada.pub, bola.pub, chike.pub])
+assert.equal(p.protected!.deposits[bola.pub], 5, 'deposit is held by the contract')
+await payProtected(bola, p)
+await payProtected(chike, p)
+const adaBefore = (await getBalances(ada.pub))!.usdc
+await payoutProtected(ada, (await loadProtected(pcode))!)
+p = (await loadProtected(pcode))!
+assert.equal(p.round, 1, 'contract advanced the round')
+assert.equal((await getBalances(ada.pub))!.usdc.toFixed(7), (adaBefore + 10).toFixed(7), 'contract paid the pot')
+assert.equal(ajoScore([p], bola.pub).onTime, 1, 'on-chain on-time count feeds the score')
+assert.ok((await discoverProtected(chike.pub)).includes(pcode), 'protected circles are discovered from the contract')
+
+console.log(`OK: ${code} paid out ${r.total} USDC (fee ${r.fee}); draw ${drawCode} order fixed; discovery found ${found.length} circles; protected ${pcode} paid out via contract`)

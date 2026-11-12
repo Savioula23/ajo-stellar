@@ -78,7 +78,8 @@ export async function getTestUsdc(me: Signer, amount = '500') {
 const ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ' // no 0/O, 1/I/L
 export const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => ALPHABET[b % ALPHABET.length]).join('')
 export const cleanCode = (s: string) => s.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6)
-export const isCode = (s: string) => /^[2-9A-HJ-NP-Z]{6}$/.test(s)
+// Standard codes never start with 1; protected (contract) codes always do.
+export const isCode = (s: string) => /^([2-9A-HJ-NP-Z]{6}|1[2-9A-HJ-NP-Z]{5})$/.test(s)
 export const showCode = (c: string) => `${c.slice(0, 3)}-${c.slice(3)}`
 // The circle's account is derived from its code, so the code alone finds it. The derived key is disabled at creation.
 const circleKeys = (code: string) => derive('ajo:circle:v1:' + code)
@@ -101,6 +102,12 @@ export type Circle = {
   round: number             // current round index; === size when complete
   startedAt?: number        // when the last seat filled
   events: CircleEvent[]     // newest first
+  periodMs?: number         // protected circles: the contract's own period
+  protected?: {             // present only for circles run by the Soroban contract
+    id: number; deposit: number; graceMs: number
+    deposits: Record<string, number>; onTime: Record<string, number>; late: Record<string, number>
+    bidder?: string; bid: number
+  }
 }
 
 // Stellar text memos cap at 28 bytes; the display name gets whatever the prefix leaves.
@@ -112,7 +119,7 @@ const memoWith = (kind: string, name: string) => {
 export const nameOf = (c: Circle, pub: string) => c.names[pub] || `${pub.slice(0, 4)}…${pub.slice(-4)}`
 
 export const pot = (c: Circle) => c.amount * (c.size - 1)
-export const dueAt = (c: Circle, r: number) => (c.startedAt ? c.startedAt + (r + 1) * PERIOD_MS[c.freq] : undefined)
+export const dueAt = (c: Circle, r: number) => (c.startedAt ? c.startedAt + (r + 1) * (c.periodMs ?? PERIOD_MS[c.freq]) : undefined)
 export const isFull = (c: Circle) => c.members.length >= c.size
 export const isDone = (c: Circle) => c.round >= c.size
 export const recipientOf = (c: Circle) => (isDone(c) || !isFull(c) ? undefined : c.order[c.round])
@@ -263,13 +270,29 @@ export function ajoScore(circles: Circle[], pub: string) {
   let onTime = 0, late = 0, completed = 0
   for (const c of circles) {
     for (const e of c.events) if (e.kind === 'pay' && e.who === pub) e.late ? late++ : onTime++
+    if (c.protected) { onTime += c.protected.onTime[pub] ?? 0; late += c.protected.late[pub] ?? 0 }
     if (isDone(c) && c.members.includes(pub)) completed++
   }
   const score = Math.max(300, Math.min(850, 500 + 25 * onTime - 40 * late + 20 * completed))
   return { score, onTime, late, completed }
 }
 
+const CONTRACT_ERRORS: Record<number, string> = {
+  1: 'Circle not found.', 2: 'Those circle settings are not allowed.', 3: 'This circle is full.', 4: "You're already in this circle.",
+  5: 'You are not a member of this circle.', 6: 'The circle has not started yet.', 7: 'This circle has finished.',
+  8: 'You already paid this round.', 9: 'The recipient does not pay their own round.', 10: 'Not everyone has paid yet.',
+  11: 'That member is not past the grace period yet.', 12: "That member's deposit cannot cover the payment.",
+  13: 'Deposits come back after the last round.', 14: 'Bid at least one contribution, above the current bid, and below the pot.',
+  15: 'Only members with a later seat can bid.',
+}
+
 export function friendlyError(e: any): string {
+  const text = String(e?.message ?? e)
+  if (/Error\(Contract, #(\d+)\)/.test(text) && !/balance|trustline/i.test(text)) {
+    const n = Number(text.match(/Error\(Contract, #(\d+)\)/)![1])
+    if (CONTRACT_ERRORS[n]) return CONTRACT_ERRORS[n]
+  }
+  if (/resulting balance is not within the allowed range|insufficient|balance/i.test(text) && /Contract|HostError/.test(text)) return 'Not enough USDC. Get test USDC from your wallet page.'
   const codes = e?.response?.data?.extras?.result_codes
   const ops: string[] = codes?.operations ?? []
   if (ops.includes('op_underfunded')) return 'Not enough USDC. Get test USDC from your wallet page.'

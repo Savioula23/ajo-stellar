@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Keypair } from '@stellar/stellar-sdk'
 import { connectFreighter, discoverCodes, fundTestnet, getBalances, loadCircle, type Circle, type Signer } from './ajo'
+import { discoverProtected, isProtectedCode, loadProtected } from './protected'
 
 export type Wallet = Signer & { kind: 'local' | 'freighter' }
 type Balances = Awaited<ReturnType<typeof getBalances>>
@@ -46,7 +47,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   // Rebuild the circle list from this wallet's ledger history, so a new device sees the same circles.
   useEffect(() => {
     if (!wallet) return
-    discoverCodes(wallet.pub).then((found) => setCodes((prev) => {
+    const all = Promise.all([discoverCodes(wallet.pub), discoverProtected(wallet.pub).catch(() => [] as string[])]).then(([a, b]) => [...a, ...b])
+    all.then((found) => setCodes((prev) => {
       const next = [...prev, ...found.filter((c) => !prev.includes(c))]
       write(codesKey(wallet.pub), next)
       return next
@@ -99,7 +101,7 @@ export function useCircles(codes: string[], everyMs = 12000) {
 
   const reload = useCallback(async () => {
     try {
-      const list = await Promise.all(codes.map(async (c) => [c, await loadCircle(c)] as const))
+      const list = await Promise.all(codes.map(async (c) => [c, await (isProtectedCode(c) ? loadProtected(c) : loadCircle(c))] as const))
       setCircles(Object.fromEntries(list))
       setError('')
     } catch {

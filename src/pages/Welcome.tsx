@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { cleanCode, isCode, loadCircle, nameOf, type Circle } from '../ajo'
 import { useWallet } from '../wallet'
+import { isProtectedCode, loadProtected } from '../protected'
 import { Avatar, ErrorNote, useAction, usdc } from '../ui'
 
 export function Welcome({ route }: { route: string }) {
@@ -10,7 +11,7 @@ export function Welcome({ route }: { route: string }) {
   const [invite, setInvite] = useState<Circle | null>(null)
   const code = route.startsWith('/join/') ? cleanCode(route.slice(6)) : ''
 
-  useEffect(() => { if (isCode(code)) loadCircle(code).then(setInvite, () => {}) }, [code])
+  useEffect(() => { if (isCode(code)) (isProtectedCode(code) ? loadProtected(code) : loadCircle(code)).then(setInvite, () => {}) }, [code])
 
   return (
     <div className="welcome">

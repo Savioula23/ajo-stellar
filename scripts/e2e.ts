@@ -39,12 +39,17 @@ try {
   await newWallet(ada)
   await mint(ada)
   await ada.goto(BASE + '#/new')
+  await ada.getByRole('radio', { name: 'Protected' }).check()
   await ada.getByLabel('Circle name').fill('E2E circle')
   await ada.getByLabel('Your name').fill('Ada')
   await ada.getByLabel('Contribution per round').fill('10')
   await ada.getByLabel('Members, including you').selectOption('3')
   await ada.getByRole('button', { name: 'Create circle' }).click()
-  await ada.waitForURL(/#\/c\/[2-9A-Z]{6}$/, { timeout: T })
+  // Protected codes start with 1; fail fast with the app's own error message if creation fails.
+  await Promise.race([
+    ada.waitForURL(/#\/c\/[1-9A-Z]{6}$/, { timeout: T }),
+    ada.locator('.error').waitFor({ timeout: T }).then(async () => { throw new Error('App error: ' + await ada.locator('.error').innerText()) }),
+  ])
   const code = ada.url().split('/').pop()!
   await ada.getByRole('img', { name: /QR code to join/ }).waitFor()
   await shot(ada, 'circle-filling')
@@ -69,22 +74,23 @@ try {
     await p.reload()
     await p.getByRole('button', { name: 'Pay 10 USDC' }).click({ timeout: T })
     await p.getByText(/You've paid round 1/).waitFor({ timeout: T })
+    await p.getByRole('cell', { name: '1', exact: true }).first().waitFor({ timeout: T }) // on-time count in Protection
   }
   step('Both members paid round 1')
   await shot(joiners[1], 'member-paid')
 
   await ada.reload()
   await ada.getByRole('button', { name: 'Claim payout' }).click({ timeout: T })
-  await ada.getByRole('link', { name: /Paid out/ }).waitFor({ timeout: T })
+  await ada.getByText('Paid out', { exact: true }).waitFor({ timeout: T })
   await ada.goto(BASE + '#/wallet')
-  await ada.locator('.balance', { hasText: '519.9 USDC' }).waitFor({ timeout: T })
+  await ada.locator('.balance', { hasText: '510 USDC' }).waitFor({ timeout: T })
   await shot(ada, 'wallet-after-payout')
-  step('Ada claimed 20 USDC, paid the 0.1 fee, balance is 519.9 USDC')
+  step('Contract paid Ada 20 USDC; balance 510 = 500 - 10 deposit held + 20 pot')
 
   const score = await person()
   await score.goto(`${BASE}#/score/${await ada.evaluate(() => JSON.parse(localStorage.getItem('ajo-wallet-v2')!).pub)}`)
   await score.getByText('E2E circle').waitFor({ timeout: T })
-  step('Public score page finds the circle with no wallet signed in')
+  step('Public score page finds the protected circle with no wallet signed in')
 
   assert.ok(true)
   console.log(`OK: full round through the UI on testnet (circle ${code})`)

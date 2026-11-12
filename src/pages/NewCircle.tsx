@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createCircle, feeOf, PERIOD_MS, type Freq, type OrderMode } from '../ajo'
+import { createProtected } from '../protected'
 import { ErrorNote, go, useAction, usdc } from '../ui'
 import { useWallet } from '../wallet'
 
@@ -17,11 +18,16 @@ export function NewCircle() {
   const [size, setSize] = useState(5)
   const [freq, setFreq] = useState<Freq>('weekly')
   const [mode, setMode] = useState<OrderMode>('join')
+  const [kind, setKind] = useState<'standard' | 'protected'>('protected')
+  const [deposit, setDeposit] = useState('')
+  const dep = deposit === '' ? Number(amount) || 0 : Number(deposit) || 0
   const amt = Number(amount) || 0
   const days = Math.round((PERIOD_MS[freq] * size) / 864e5)
 
   const submit = () => run('create', async () => {
-    const code = await createCircle(wallet!, { name, you, amount: amt, size, freq, mode })
+    const code = kind === 'protected'
+      ? await createProtected(wallet!, { name, you, amount: amt, deposit: dep, size, freq, draw: mode === 'draw' })
+      : await createCircle(wallet!, { name, you, amount: amt, size, freq, mode })
     saveName(you)
     addCode(code)
     go(`/c/${code}`)
@@ -38,6 +44,20 @@ export function NewCircle() {
       </div>
       <div className="layout">
         <form className="card" onSubmit={(e) => { e.preventDefault(); submit() }}>
+          <div className="field">
+            <span className="label" id="kind">Protection</span>
+            <div className="seg" role="radiogroup" aria-labelledby="kind">
+              {([['protected', 'Protected'], ['standard', 'Standard']] as const).map(([v, l]) => (
+                <label key={v}>
+                  <input type="radio" name="kind" value={v} checked={kind === v} onChange={() => setKind(v)} />
+                  <span>{l}</span>
+                </label>
+              ))}
+            </div>
+            <span className="hint">{kind === 'protected'
+              ? 'Runs in the Ajo smart contract. Everyone puts down a refundable deposit that covers a missed payment, and members can bid for an early payout.'
+              : 'No deposit. Payments are locked for each recipient, but nothing covers a member who stops paying.'}</span>
+          </div>
           <label className="field">
             <span className="label">Circle name</span>
             <input className="input" maxLength={40} required placeholder="Market women, Itam" value={name} onChange={(e) => setName(e.target.value)} />
@@ -54,6 +74,16 @@ export function NewCircle() {
               <span className="unit">USDC</span>
             </span>
           </label>
+          {kind === 'protected' && (
+            <label className="field">
+              <span className="label">Refundable deposit</span>
+              <span className="input-group">
+                <input className="input num" inputMode="decimal" placeholder={amount} value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/[^0-9.]/g, ''))} />
+                <span className="unit">USDC</span>
+              </span>
+              <span className="hint">Held by the contract and returned after the last round. One contribution covers one missed payment.</span>
+            </label>
+          )}
           <div className="field">
             <span className="label" id="freq">How often</span>
             <div className="seg" role="radiogroup" aria-labelledby="freq">
@@ -99,8 +129,10 @@ export function NewCircle() {
             <dt>Rounds</dt><dd>{size}, one per {unit[freq]}</dd>
             <dt>Full cycle</dt><dd>about {days} days</dd>
             <dt>You pay in total</dt><dd>{usdc(amt * (size - 1))}</dd>
-            <dt>You receive</dt><dd>{usdc(amt * (size - 1) - feeOf(amt * (size - 1)))}, once</dd>
-            <dt>Service fee</dt><dd>0.5% of your payout</dd>
+            <dt>You receive</dt><dd>{usdc(amt * (size - 1) - (kind === 'standard' ? feeOf(amt * (size - 1)) : 0))}, once</dd>
+            {kind === 'protected'
+              ? <><dt>Deposit (refunded)</dt><dd>{usdc(dep)}</dd></>
+              : <><dt>Service fee</dt><dd>0.5% of your payout</dd></>}
           </dl>
           <div className="divider" />
           <p className="small muted">

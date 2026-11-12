@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { cleanCode, dueAt, isCode, isFull, joinCircle, nameOf, seatOrder, showCode, type Circle } from '../ajo'
+import { joinProtected } from '../protected'
 import { Avatar, ErrorNote, Skeleton, day, go, useAction, usdc } from '../ui'
 import { useCircles, useWallet } from '../wallet'
 import { saveName, savedName } from './NewCircle'
@@ -74,13 +75,18 @@ function Preview({ code }: { code: string }) {
           ) : (
             <form onSubmit={(e) => {
               e.preventDefault()
-              run('join', async () => { await joinCircle(wallet!, c, name); saveName(name); addCode(code); go(`/c/${code}`) })
+              run('join', async () => {
+                if (!name.trim()) throw new Error('Add your name so members know who you are.')
+                await (c.protected ? joinProtected(wallet!, c, name) : joinCircle(wallet!, c, name))
+                saveName(name); addCode(code); go(`/c/${code}`)
+              })
             }}>
               <p className="section-title">Take seat {seat} of {c.size}</p>
               <dl className="kv" style={{ marginBottom: 'var(--space-lg)' }}>
                 <dt>You pay each round</dt><dd>{usdc(c.amount)}</dd>
                 <dt>Your payout</dt><dd>{usdc(c.amount * (c.size - 1))} in {c.mode === 'draw' ? 'a round drawn when the circle fills' : `round ${seat}`}</dd>
                 <dt>Rounds</dt><dd>{c.size}, {c.freq}</dd>
+                {c.protected && <><dt>Deposit now (refunded)</dt><dd>{usdc(c.protected.deposit)}</dd></>}
               </dl>
               <label className="field">
                 <span className="label">Your name</span>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { StrKey } from '@stellar/stellar-sdk'
 import { ajoScore, discoverCodes, explorerAccount, isDone, nameOf, type Circle } from '../ajo'
+import { discoverProtected } from '../protected'
 import { CopyButton, ErrorNote, Skeleton, scoreLink, short, usdc } from '../ui'
 import { useCircles } from '../wallet'
 
@@ -10,7 +11,8 @@ export function ScorePage({ pub }: { pub: string }) {
   const [codes, setCodes] = useState<string[] | null>(null)
   const [error, setError] = useState('')
   useEffect(() => {
-    if (valid) discoverCodes(pub).then(setCodes, () => setError('Could not reach the Stellar network.'))
+    if (valid) Promise.all([discoverCodes(pub), discoverProtected(pub).catch(() => [] as string[])])
+      .then(([a, b]) => setCodes([...a, ...b]), () => setError('Could not reach the Stellar network.'))
   }, [pub, valid])
   const { circles, loading } = useCircles(codes ?? [], 60000)
 
@@ -80,7 +82,7 @@ export function ScorePage({ pub }: { pub: string }) {
         <aside className="card">
           <p className="section-title">How to verify this</p>
           <p className="small muted">
-            Every circle above was found from this wallet's own transactions on the Stellar ledger, so circles cannot be left out.
+            Every circle above was found from this wallet's own ledger history and from the Ajo contract's records, so circles cannot be left out.
             Each payment is checked against the round's due date. The score starts at 500: +25 per on-time payment,
             −40 per late payment, +20 per completed circle, kept between 300 and 850.
           </p>
