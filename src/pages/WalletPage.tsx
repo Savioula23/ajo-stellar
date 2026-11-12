@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ANCHOR_DOMAIN, anchorBalance, startTransfer } from '../anchor'
+import { ANCHOR_DOMAIN, anchorBalance, moveToSavings, startTransfer } from '../anchor'
 import { ajoScore, explorerAccount, getTestUsdc, type Circle } from '../ajo'
-import { CopyButton, ErrorNote, go, scoreLink, useAction, usdc } from '../ui'
+import { CopyButton, ErrorNote, go, NGN_PER_USDC, scoreLink, useAction, naira, usdc } from '../ui'
 import { useCircles, useWallet } from '../wallet'
 
 export function WalletPage() {
@@ -24,13 +24,13 @@ export function WalletPage() {
       <div className="layout">
         <div>
           <section className="card">
-            <p className="small muted">USDC balance</p>
-            <p className="balance">{balances ? usdc(balances.usdc) : '—'}</p>
-            <p className="small muted" style={{ marginTop: 'var(--space-xs)' }}>{balances ? `${balances.xlm.toFixed(2)} XLM for network fees` : 'Loading balances…'}</p>
+            <p className="small muted">Savings balance</p>
+            <p className="balance">{balances ? naira(balances.usdc) : '—'}</p>
+            <p className="small muted" style={{ marginTop: 'var(--space-xs)' }}>{balances ? `${usdc(balances.usdc)} on Stellar at ₦${NGN_PER_USDC.toLocaleString('en-US')} per USDC · ${balances.xlm.toFixed(2)} XLM for network fees` : 'Loading balances…'}</p>
             <div className="actions" style={{ marginTop: 'var(--space-lg)' }}>
               <button className="btn btn-accent" disabled={!!faucet.busy} aria-busy={!!faucet.busy}
                 onClick={() => faucet.run('mint', async () => { await getTestUsdc(w); refreshBalances() })}>
-                {faucet.busy ? 'Minting…' : 'Get 500 test USDC'}
+                {faucet.busy ? 'Minting…' : `Get ${naira(500)} test money`}
               </button>
               <a className="btn btn-ghost" href={explorerAccount(w.pub)} target="_blank" rel="noreferrer">View on Stellar Expert ↗</a>
             </div>
@@ -105,11 +105,11 @@ export function WalletPage() {
 
 /** Money in and out through a Stellar anchor (SEP-10 sign-in + SEP-24 hosted KYC and bank details). */
 function CashPanel() {
-  const { wallet } = useWallet()
+  const { wallet, balances, refreshBalances } = useWallet()
   const { busy, error, run } = useAction()
   const [status, setStatus] = useState('')
   const [bal, setBal] = useState<number | null>(null)
-  const refresh = () => anchorBalance(wallet!.pub).then(setBal, () => {})
+  const refresh = () => { refreshBalances(); anchorBalance(wallet!.pub).then(setBal, () => {}) }
   useEffect(() => { refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (kind: 'deposit' | 'withdraw') => {
@@ -123,15 +123,20 @@ function CashPanel() {
     <section className="card" aria-labelledby="cash">
       <h2 className="section-title" id="cash">Add money or cash out</h2>
       <p className="small muted">
-        Bank transfers in and out go through an anchor, a licensed company that swaps local currency for USDC on Stellar.
-        This preview uses the Stellar Development Foundation's test anchor ({ANCHOR_DOMAIN}), with its test KYC form and fake bank.
+        Bank transfers in and out go through an anchor, a licensed company that swaps naira for USDC on Stellar.
+        Deposits land in your savings balance. This preview uses the Stellar Development Foundation's test anchor ({ANCHOR_DOMAIN}),
+        which works in US dollars with a test KYC form and fake bank; a naira anchor replaces it at launch.
       </p>
-      <dl className="kv" style={{ marginTop: 'var(--space-md)' }}>
-        <dt>Anchor USDC balance</dt><dd>{bal === null ? 'not set up yet' : usdc(bal)}</dd>
-      </dl>
+      {!!bal && (
+        <div className="actions" style={{ marginTop: 'var(--space-md)', alignItems: 'center' }}>
+          <span className="small">{naira(bal)} from the anchor is not in your savings yet.</span>
+          <button className="btn btn-accent btn-sm" disabled={!!busy} aria-busy={busy === 'move'}
+            onClick={() => run('move', async () => { await moveToSavings(wallet!, bal); refresh() })}>Move to savings</button>
+        </div>
+      )}
       <div className="actions" style={{ marginTop: 'var(--space-md)' }}>
         <button className="btn btn-ghost" disabled={!!busy} aria-busy={busy === 'deposit'} onClick={() => go('deposit')}>Add money</button>
-        <button className="btn btn-ghost" disabled={!!busy || !bal} aria-busy={busy === 'withdraw'} onClick={() => go('withdraw')}>Cash out</button>
+        <button className="btn btn-ghost" disabled={!!busy || !(balances?.usdc || bal)} aria-busy={busy === 'withdraw'} onClick={() => go('withdraw')}>Cash out</button>
       </div>
       {status && <p className="small" role="status" style={{ marginTop: 'var(--space-sm)' }}>{status}</p>}
       <ErrorNote>{error}</ErrorNote>

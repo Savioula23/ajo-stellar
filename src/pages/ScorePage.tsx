@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { StrKey } from '@stellar/stellar-sdk'
 import { ajoScore, discoverCodes, explorerAccount, isDone, nameOf, type Circle } from '../ajo'
 import { discoverProtected } from '../protected'
-import { CopyButton, ErrorNote, Skeleton, scoreLink, short, usdc } from '../ui'
+import { CopyButton, ErrorNote, Skeleton, scoreLink, short, naira } from '../ui'
 import { useCircles } from '../wallet'
 
 /** Public, verifiable score: circles are discovered from the wallet's own ledger history, so none can be hidden. */
@@ -67,7 +67,7 @@ export function ScorePage({ pub }: { pub: string }) {
                       return (
                         <tr key={c.code}>
                           <td className="who">{c.name}<div className="muted xs">organised by {nameOf(c, c.creator)}</div></td>
-                          <td className="num">{usdc(c.amount)}</td>
+                          <td className="num">{naira(c.amount)}</td>
                           <td className="due num">{mine.length - late} on time{late ? `, ${late} late` : ''}</td>
                           <td><span className={`pill ${isDone(c) ? 'pill-ok' : ''}`}>{isDone(c) ? 'Completed' : `Round ${c.round + 1} of ${c.size}`}</span></td>
                         </tr>

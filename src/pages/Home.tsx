@@ -1,6 +1,6 @@
 import { ajoScore, getTestUsdc, isDone, type Circle } from '../ajo'
 import { statusOf } from '../status'
-import { ErrorNote, Skeleton, useAction, usdc } from '../ui'
+import { ErrorNote, Skeleton, useAction, naira } from '../ui'
 import { useCircles, useWallet } from '../wallet'
 
 export function CircleRow({ c, me }: { c: Circle; me: string }) {
@@ -9,7 +9,7 @@ export function CircleRow({ c, me }: { c: Circle; me: string }) {
     <a className="circle-row" href={`#/c/${c.code}`}>
       <div>
         <h3>{c.name}</h3>
-        <p className="meta">{usdc(c.amount)} {c.freq} · {c.size} members · round {Math.min(c.round + 1, c.size)} of {c.size}</p>
+        <p className="meta">{naira(c.amount)} {c.freq} · {c.size} members · round {Math.min(c.round + 1, c.size)} of {c.size}</p>
       </div>
       <span className={`pill pill-${s.tone}`}>{s.label}</span>
       <div className="segs" aria-hidden="true">
@@ -47,12 +47,12 @@ export function Home() {
       {balances && balances.usdc === 0 && (
         <div className="callout" style={{ marginBottom: 'var(--space-xl)' }}>
           <div>
-            <h2>Add test USDC to get started</h2>
-            <p>Contributions are paid in USDC. On testnet you can mint some for free.</p>
+            <h2>Add test money to get started</h2>
+            <p>Amounts show in naira and are held as USDC on Stellar. On testnet you can mint some for free.</p>
           </div>
           <button className="btn btn-accent" disabled={!!faucet.busy} aria-busy={!!faucet.busy}
             onClick={() => faucet.run('mint', async () => { await getTestUsdc(wallet!); refreshBalances() })}>
-            Get 500 test USDC
+            Get {naira(500)} test money
           </button>
           <ErrorNote>{faucet.error}</ErrorNote>
         </div>
@@ -89,7 +89,7 @@ export function Home() {
           </div>
           <div className="divider" />
           <dl className="kv">
-            <dt>Wallet balance</dt><dd className="num">{balances ? usdc(balances.usdc) : '—'}</dd>
+            <dt>Wallet balance</dt><dd className="num">{balances ? naira(balances.usdc) : '—'}</dd>
           </dl>
           <a className="small" href={`#/score/${me}`} style={{ display: 'inline-block', marginTop: 'var(--space-md)' }}>View your public record</a>
         </aside>

@@ -28,8 +28,8 @@ async function newWallet(p: Page) {
 }
 async function mint(p: Page) {
   await p.goto(BASE + '#/wallet')
-  await p.getByRole('button', { name: 'Get 500 test USDC' }).click()
-  await p.locator('.balance', { hasText: '500 USDC' }).waitFor({ timeout: T })
+  await p.getByRole('button', { name: 'Get ₦750,000 test money' }).click()
+  await p.locator('.balance', { hasText: '₦750,000' }).waitFor({ timeout: T })
 }
 
 try {
@@ -42,7 +42,7 @@ try {
   await ada.getByRole('radio', { name: 'Protected' }).check()
   await ada.getByLabel('Circle name').fill('E2E circle')
   await ada.getByLabel('Your name').fill('Ada')
-  await ada.getByLabel('Contribution per round').fill('10')
+  await ada.getByLabel('Contribution per round').fill('15000')
   await ada.getByLabel('Members, including you').selectOption('3')
   await ada.getByRole('button', { name: 'Create circle' }).click()
   // Protected codes start with 1; fail fast with the app's own error message if creation fails.
@@ -72,7 +72,7 @@ try {
 
   for (const p of joiners) {
     await p.reload()
-    await p.getByRole('button', { name: 'Pay 10 USDC' }).click({ timeout: T })
+    await p.getByRole('button', { name: 'Pay ₦15,000' }).click({ timeout: T })
     await p.getByText(/You've paid round 1/).waitFor({ timeout: T })
     await p.getByRole('cell', { name: '1', exact: true }).first().waitFor({ timeout: T }) // on-time count in Protection
   }
@@ -83,9 +83,9 @@ try {
   await ada.getByRole('button', { name: 'Claim payout' }).click({ timeout: T })
   await ada.getByText('Paid out', { exact: true }).waitFor({ timeout: T })
   await ada.goto(BASE + '#/wallet')
-  await ada.locator('.balance', { hasText: '510 USDC' }).waitFor({ timeout: T })
+  await ada.locator('.balance', { hasText: '₦765,000' }).waitFor({ timeout: T })
   await shot(ada, 'wallet-after-payout')
-  step('Contract paid Ada 20 USDC; balance 510 = 500 - 10 deposit held + 20 pot')
+  step('Contract paid Ada 20 USDC; balance ₦765,000 = 750k - 15k deposit + 30k pot')
 
   const score = await person()
   await score.goto(`${BASE}#/score/${await ada.evaluate(() => JSON.parse(localStorage.getItem('ajo-wallet-v2')!).pub)}`)

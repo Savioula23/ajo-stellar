@@ -22,7 +22,7 @@ console.log('Everyone else pays round 1…')
 for (const x of [bola, chike, dayo]) await payProtected(x, c)
 
 console.log(`
-Ready. Circle ${showCode(code)} has 75 USDC in the contract waiting for "You".
+Ready. Circle ${showCode(code)} has ₦112,500 (75 USDC) in the contract waiting for "You".
   1. Open the app, choose "I already have a secret key", paste:
      ${you.secret}
   2. Open the circle and press "Claim payout". The Protection panel shows every deposit held.

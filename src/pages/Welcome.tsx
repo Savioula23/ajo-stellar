@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { cleanCode, isCode, loadCircle, nameOf, type Circle } from '../ajo'
 import { useWallet } from '../wallet'
 import { isProtectedCode, loadProtected } from '../protected'
-import { Avatar, ErrorNote, useAction, usdc } from '../ui'
+import { Avatar, ErrorNote, useAction, naira } from '../ui'
 
 export function Welcome({ route }: { route: string }) {
   const { createLocal, connectFreighterWallet, importSecret } = useWallet()
@@ -21,7 +21,7 @@ export function Welcome({ route }: { route: string }) {
             <Avatar name={nameOf(invite, invite.creator)} />
             <div>
               <b>{nameOf(invite, invite.creator)} invited you to {invite.name}</b>
-              <p className="small muted">{usdc(invite.amount)} {invite.freq} · {invite.members.length} of {invite.size} seats taken. Set up a wallet to join.</p>
+              <p className="small muted">{naira(invite.amount)} {invite.freq} · {invite.members.length} of {invite.size} seats taken. Set up a wallet to join.</p>
             </div>
           </div>
         )}
@@ -49,7 +49,7 @@ export function Welcome({ route }: { route: string }) {
           </form>
         </details>
         <p className="xs muted" style={{ marginTop: 'var(--space-lg)' }}>
-          Preview on Stellar testnet. New wallets get test XLM for fees, and the USDC here is test money.
+          Preview on Stellar testnet. New wallets get test XLM for fees, and the money here is test money.
         </p>
       </div>
       <ol className="steps card">

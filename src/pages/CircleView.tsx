@@ -5,7 +5,7 @@ import {
   seatOrder, showCode, type Circle, type CircleEvent,
 } from '../ajo'
 import {
-  Adire, Avatar, CopyButton, ErrorNote, Qr, Skeleton, ago, circleLink, day, joinLink, until, useAction, usdc, whatsapp,
+  Adire, Avatar, CopyButton, ErrorNote, Qr, Skeleton, ago, circleLink, day, joinLink, until, useAction, naira, fromNaira, NGN_PER_USDC, whatsapp,
 } from '../ui'
 import { useCircles, useWallet } from '../wallet'
 
@@ -35,7 +35,7 @@ export function CircleView({ code }: { code: string }) {
         <div>
           <h1>{c.name}</h1>
           <p className="sub">
-            {usdc(c.amount)} {c.freq} · {c.size} members · pot {usdc(pot(c))} · {c.mode === 'draw' ? 'random draw' : 'join order'}
+            {naira(c.amount)} {c.freq} · {c.size} members · pot {naira(pot(c))} · {c.mode === 'draw' ? 'random draw' : 'join order'}
             {c.startedAt ? ` · started ${day(c.startedAt)}` : ''}
           </p>
         </div>
@@ -64,11 +64,11 @@ export function CircleView({ code }: { code: string }) {
           </div>
           <div className="card">
             <dl className="kv">
-              <dt>Contribution</dt><dd>{usdc(c.amount)}</dd>
+              <dt>Contribution</dt><dd>{naira(c.amount)}</dd>
               <dt>Frequency</dt><dd>{c.freq}</dd>
               <dt>Payout order</dt><dd>{c.mode === 'draw' ? 'Random draw' : 'Join order'}</dd>
               {c.protected
-                ? <><dt>Deposit</dt><dd>{usdc(c.protected.deposit)}, refunded at the end</dd></>
+                ? <><dt>Deposit</dt><dd>{naira(c.protected.deposit)}, refunded at the end</dd></>
                 : <><dt>Service fee</dt><dd>0.5% of each payout</dd></>}
               <dt>Organiser</dt><dd>{nameOf(c, c.creator)}</dd>
               <dt>{c.protected ? 'Contract' : 'Circle account'}</dt><dd><a href={c.protected ? `https://stellar.expert/explorer/testnet/contract/${c.account}` : explorerAccount(c.account)} target="_blank" rel="noreferrer" className="mono">{c.account.slice(0, 6)}… ↗</a></dd>
@@ -107,24 +107,24 @@ function NextStep({ c, me, member, after }: { c: Circle; me: string; member: boo
     action = member ? null : <a className="btn btn-accent" href={`#/join/${c.code}`}>Join this circle</a>
   } else if (isDone(c)) {
     tone = 'is-quiet'; title = 'Circle complete'
-    body = `All ${c.size} members received ${usdc(pot(c))}.`
+    body = `All ${c.size} members received ${naira(pot(c))}.`
     action = <a className="btn btn-ghost" href="#/new">Start another</a>
   } else if (canClaim(c, me)) {
     const fee = c.protected ? 0 : feeOf(pot(c))
     const bid = c.protected?.bidder ? c.protected.bid : 0
-    title = `Your ${usdc(pot(c))} is ready`
+    title = `Your ${naira(pot(c))} is ready`
     body = c.protected
-      ? bid ? `Everyone paid round ${c.round + 1}. ${nameOf(c, c.protected.bidder!)} bid ${usdc(bid)} to take this round, so they take the pot and you receive the bid now.` : `Everyone paid round ${c.round + 1}. The contract releases it to you.`
-      : `Everyone paid round ${c.round + 1}. You receive ${usdc(pot(c) - fee)} after the ${usdc(fee)} service fee.`
+      ? bid ? `Everyone paid round ${c.round + 1}. ${nameOf(c, c.protected.bidder!)} bid ${naira(bid)} to take this round, so they take the pot and you receive the bid now.` : `Everyone paid round ${c.round + 1}. The contract releases it to you.`
+      : `Everyone paid round ${c.round + 1}. You receive ${naira(pot(c) - fee)} after the ${naira(fee)} service fee.`
     action = <button className="btn btn-accent" disabled={!!busy} aria-busy={!!busy}
       onClick={() => run('claim', async () => { await (c.protected ? payoutProtected(wallet!, c) : claimPot(wallet!, c)); after() })}>{busy ? 'Claiming…' : 'Claim payout'}</button>
   } else if (owes(c, me)) {
     const late = !!due && Date.now() > due
     tone = late ? 'is-urgent' : ''
-    title = `Pay ${usdc(c.amount)} to ${nameOf(c, rec!)}`
+    title = `Pay ${naira(c.amount)} to ${nameOf(c, rec!)}`
     body = `Round ${c.round + 1} of ${c.size}, ${until(due)}. It stays locked until ${nameOf(c, rec!)} claims it.`
     action = <button className="btn btn-accent" disabled={!!busy} aria-busy={!!busy}
-      onClick={() => run('pay', async () => { await (c.protected ? payProtected(wallet!, c) : payRound(wallet!, c)); after() })}>{busy ? 'Paying…' : `Pay ${usdc(c.amount)}`}</button>
+      onClick={() => run('pay', async () => { await (c.protected ? payProtected(wallet!, c) : payRound(wallet!, c)); after() })}>{busy ? 'Paying…' : `Pay ${naira(c.amount)}`}</button>
   } else if (rec === me) {
     tone = 'is-quiet'; title = 'You receive this round'
     body = `${c.paid[c.round].length} of ${c.size - 1} paid. Still waiting on ${unpaidNames}.`
@@ -206,7 +206,7 @@ function InvitePass({ c }: { c: Circle }) {
   const link = joinLink(c.code)
   const left = c.size - c.members.length
   const canShare = typeof navigator.share === 'function'
-  const text = `Join my ajo "${c.name}": ${usdc(c.amount)} ${c.freq}, ${c.size} members. Code ${showCode(c.code)}`
+  const text = `Join my ajo "${c.name}": ${naira(c.amount)} ${c.freq}, ${c.size} members. Code ${showCode(c.code)}`
   return (
     <div className="pass">
       <Adire />
@@ -234,7 +234,7 @@ const describe = (c: Circle, e: CircleEvent) => {
   if (e.kind === 'create') return `${n} started the circle`
   if (e.kind === 'join') return `${n} joined`
   if (e.kind === 'pay') return `${n} paid round ${e.round! + 1}${e.late ? ' (late)' : ''}`
-  return `${n} received ${usdc(pot(c))}`
+  return `${n} received ${naira(pot(c))}`
 }
 
 function Feed({ c }: { c: Circle }) {
@@ -261,7 +261,7 @@ function downloadIcs(c: Circle, me: string) {
     const mine = order[r] === me
     lines.push(
       'BEGIN:VEVENT', `UID:${c.code}-${r}@ajo`, `DTSTAMP:${stamp(Date.now())}`, `DTSTART:${stamp(due)}`, 'DURATION:PT30M',
-      `SUMMARY:${mine ? `Your ajo payout: ${c.name}` : `Pay ${usdc(c.amount)} · ${c.name}`}`,
+      `SUMMARY:${mine ? `Your ajo payout: ${c.name}` : `Pay ${naira(c.amount)} · ${c.name}`}`,
       `DESCRIPTION:Round ${r + 1} of ${c.size}. ${circleLink(c.code)}`,
       'BEGIN:VALARM', 'TRIGGER:-P1D', 'ACTION:DISPLAY', 'DESCRIPTION:Ajo payment due tomorrow', 'END:VALARM', 'END:VEVENT',
     )
@@ -297,7 +297,7 @@ function Protection({ c, me, member, after }: { c: Circle; me: string; member: b
             {c.members.map((m) => (
               <tr key={m}>
                 <td className="who">{nameOf(c, m)}{m === me ? ' (you)' : ''}</td>
-                <td className="num">{usdc(p.deposits[m] ?? 0)}</td>
+                <td className="num">{naira(p.deposits[m] ?? 0)}</td>
                 <td className="due num">{p.onTime[m] ?? 0}</td>
                 <td className="num">{p.late[m] ?? 0}</td>
               </tr>
@@ -322,16 +322,16 @@ function Protection({ c, me, member, after }: { c: Circle; me: string; member: b
           <>
             <div className="divider" />
             {p.bidder
-              ? <p className="small">Highest bid for round {c.round + 1}: <b>{usdc(p.bid)}</b> by {nameOf(c, p.bidder)}. If it stands, they take this round and pay {nameOf(c, recipientOf(c)!)} the bid.</p>
+              ? <p className="small">Highest bid for round {c.round + 1}: <b>{naira(p.bid)}</b> by {nameOf(c, p.bidder)}. If it stands, they take this round and pay {nameOf(c, recipientOf(c)!)} the bid.</p>
               : <p className="small muted">Members with a later seat can bid to take round {c.round + 1} early. The bid goes to the member they swap with.</p>}
             {canBid && (
               <form className="actions" style={{ marginTop: 'var(--space-sm)', alignItems: 'center' }}
-                onSubmit={(e) => { e.preventDefault(); run('bid', async () => { await bidProtected(wallet!, c, Number(bid)); setBid(''); after() }) }}>
+                onSubmit={(e) => { e.preventDefault(); run('bid', async () => { await bidProtected(wallet!, c, fromNaira(bid)); setBid(''); after() }) }}>
                 <span className="input-group" style={{ flex: '1 1 180px' }}>
                   <label className="sr-only" htmlFor="bid">Bid amount</label>
-                  <input id="bid" className="input num" inputMode="decimal" placeholder={minBid.toFixed(2)} value={bid}
+                  <input id="bid" className="input num" inputMode="decimal" placeholder={String(Math.ceil(minBid * NGN_PER_USDC))} value={bid}
                     onChange={(e) => setBid(e.target.value.replace(/[^0-9.]/g, ''))} />
-                  <span className="unit">USDC</span>
+                  <span className="unit">₦</span>
                 </span>
                 <button className="btn btn-ghost btn-sm" disabled={!bid || !!busy} aria-busy={busy === 'bid'}>Bid for early payout</button>
               </form>
@@ -344,7 +344,7 @@ function Protection({ c, me, member, after }: { c: Circle; me: string; member: b
             <div className="divider" />
             <button className="btn btn-accent btn-sm" disabled={!!busy} aria-busy={busy === 'refund'}
               onClick={() => run('refund', async () => { await refundProtected(wallet!, c); after() })}>
-              Get my {usdc(p.deposits[me])} deposit back
+              Get my {naira(p.deposits[me])} deposit back
             </button>
           </>
         )}

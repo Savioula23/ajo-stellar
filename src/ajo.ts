@@ -14,7 +14,7 @@ const derive = (phrase: string) => Keypair.fromRawEd25519Seed(hash(Buffer.from(p
 
 // shortcut: testnet "USDC" whose issuer key is derived from a public phrase, so anyone can mint test money.
 // On mainnet, point USDC at Circle's issuer and delete getTestUsdc.
-const issuer = derive('ajo:demo-usdc:v1')
+export const issuer = derive('ajo:demo-usdc:v1')
 export const USDC = new Asset('USDC', issuer.publicKey())
 const DUST = '0.0000001' // XLM attached to every circle event so it lands in the circle account's history
 

@@ -31,7 +31,12 @@ export function useAction() {
 
 /* ---------- Formatting ---------- */
 
+// shortcut: fixed display rate; at launch take it from the naira anchor's SEP-38 quote.
+export const NGN_PER_USDC = Number((import.meta as any).env?.VITE_NGN_RATE) || 1500
+/** Money is held as USDC on Stellar and shown in naira. */
+export const naira = (usd: number) => `₦${Math.round(usd * NGN_PER_USDC).toLocaleString('en-US')}`
 export const usdc = (n: number) => `${n.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDC`
+export const fromNaira = (ngn: string) => Math.round((Number(ngn) / NGN_PER_USDC) * 1e7) / 1e7
 export const short = (pub: string) => `${pub.slice(0, 4)}…${pub.slice(-4)}`
 export const initials = (name: string) => name.trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?'
 const dayFmt = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })

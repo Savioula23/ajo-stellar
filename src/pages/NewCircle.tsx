@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createCircle, feeOf, PERIOD_MS, type Freq, type OrderMode } from '../ajo'
 import { createProtected } from '../protected'
-import { ErrorNote, go, useAction, usdc } from '../ui'
+import { ErrorNote, fromNaira, go, useAction, naira } from '../ui'
 import { useWallet } from '../wallet'
 
 const FREQS: Freq[] = ['daily', 'weekly', 'monthly']
@@ -14,14 +14,14 @@ export function NewCircle() {
   const { busy, error, run } = useAction()
   const [name, setName] = useState('')
   const [you, setYou] = useState(savedName)
-  const [amount, setAmount] = useState('20')
+  const [amount, setAmount] = useState('30000')
   const [size, setSize] = useState(5)
   const [freq, setFreq] = useState<Freq>('weekly')
   const [mode, setMode] = useState<OrderMode>('join')
   const [kind, setKind] = useState<'standard' | 'protected'>('protected')
   const [deposit, setDeposit] = useState('')
-  const dep = deposit === '' ? Number(amount) || 0 : Number(deposit) || 0
-  const amt = Number(amount) || 0
+  const amt = fromNaira(amount) || 0
+  const dep = deposit === '' ? amt : fromNaira(deposit) || 0
   const days = Math.round((PERIOD_MS[freq] * size) / 864e5)
 
   const submit = () => run('create', async () => {
@@ -71,7 +71,7 @@ export function NewCircle() {
             <span className="label">Contribution per round</span>
             <span className="input-group">
               <input className="input num" inputMode="decimal" required value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
-              <span className="unit">USDC</span>
+              <span className="unit">₦</span>
             </span>
           </label>
           {kind === 'protected' && (
@@ -79,7 +79,7 @@ export function NewCircle() {
               <span className="label">Refundable deposit</span>
               <span className="input-group">
                 <input className="input num" inputMode="decimal" placeholder={amount} value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/[^0-9.]/g, ''))} />
-                <span className="unit">USDC</span>
+                <span className="unit">₦</span>
               </span>
               <span className="hint">Held by the contract and returned after the last round. One contribution covers one missed payment.</span>
             </label>
@@ -124,14 +124,14 @@ export function NewCircle() {
         <aside className="card">
           <p className="section-title">How this circle runs</p>
           <dl className="kv">
-            <dt>Each round you pay</dt><dd>{usdc(amt)}</dd>
-            <dt>Pot each round</dt><dd>{usdc(amt * (size - 1))}</dd>
+            <dt>Each round you pay</dt><dd>{naira(amt)}</dd>
+            <dt>Pot each round</dt><dd>{naira(amt * (size - 1))}</dd>
             <dt>Rounds</dt><dd>{size}, one per {unit[freq]}</dd>
             <dt>Full cycle</dt><dd>about {days} days</dd>
-            <dt>You pay in total</dt><dd>{usdc(amt * (size - 1))}</dd>
-            <dt>You receive</dt><dd>{usdc(amt * (size - 1) - (kind === 'standard' ? feeOf(amt * (size - 1)) : 0))}, once</dd>
+            <dt>You pay in total</dt><dd>{naira(amt * (size - 1))}</dd>
+            <dt>You receive</dt><dd>{naira(amt * (size - 1) - (kind === 'standard' ? feeOf(amt * (size - 1)) : 0))}, once</dd>
             {kind === 'protected'
-              ? <><dt>Deposit (refunded)</dt><dd>{usdc(dep)}</dd></>
+              ? <><dt>Deposit (refunded)</dt><dd>{naira(dep)}</dd></>
               : <><dt>Service fee</dt><dd>0.5% of your payout</dd></>}
           </dl>
           <div className="divider" />

@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer'
 import { Asset, Keypair, Memo, Operation, StellarToml, TransactionBuilder, WebAuth } from '@stellar/stellar-sdk'
-import { NETWORK, server, submit, type Signer } from './ajo.ts'
+import { NETWORK, USDC, getBalances, issuer, server, submit, type Signer } from './ajo.ts'
 
 // shortcut: SDF's public test anchor. For launch, point ANCHOR_DOMAIN at a licensed naira anchor; the SEP-10/24 flow is identical.
 export const ANCHOR_DOMAIN = 'testanchor.stellar.org'
@@ -39,6 +39,27 @@ export async function anchorBalance(pub: string) {
 }
 
 /**
+ * Swap the anchor's USDC 1:1 with the savings USDC that circles use, in one atomic transaction.
+ * shortcut: testnet only. The demo issuer doubles as the reserve and its key is public; on mainnet both are
+ * Circle's USDC, so deposits are already savings and this disappears.
+ */
+async function swap(me: Signer, amount: number, toSavings: boolean) {
+  const amt = amount.toFixed(7)
+  if ((await anchorBalance(issuer.publicKey())) === null) {
+    await submit({ pub: issuer.publicKey(), secret: issuer.secret() }, [Operation.changeTrust({ asset: ANCHOR_USDC })])
+  }
+  const [give, get] = toSavings ? [ANCHOR_USDC, USDC] : [USDC, ANCHOR_USDC]
+  const trustUsdc = toSavings && !(await getBalances(me.pub))?.trusted ? [Operation.changeTrust({ asset: USDC })] : []
+  return submit(me, [
+    ...trustUsdc,
+    Operation.payment({ destination: issuer.publicKey(), asset: give, amount: amt }),
+    Operation.payment({ source: issuer.publicKey(), destination: me.pub, asset: get, amount: amt }),
+  ], undefined, [issuer])
+}
+export const moveToSavings = (me: Signer, amount: number) => swap(me, amount, true)
+export const swapOut = (me: Signer, amount: number) => swap(me, amount, false)
+
+/**
  * SEP-24: open the anchor's own KYC and bank-details form. `popup` must be opened by the click handler
  * (browsers block popups opened after an await). For a withdrawal, once the user finishes the form we
  * send the USDC to the anchor with the memo it asks for.
@@ -67,12 +88,18 @@ export async function startTransfer(me: Signer, kind: 'deposit' | 'withdraw', po
     const { transaction: tx } = await fetch(`${transfer}/transaction?id=${r.id}`, { headers: { Authorization: `Bearer ${token}` } }).then((x) => x.json())
     if (!tx) continue
     if (kind === 'withdraw' && tx.status === 'pending_user_transfer_start') {
+      const short = Number(tx.amount_in) - ((await anchorBalance(me.pub)) ?? 0)
+      if (short > 0) { onStatus('Moving money out of savings…'); await swap(me, short, false) }
       onStatus(`Sending ${tx.amount_in} USDC to the anchor…`)
       const memo = tx.withdraw_memo_type === 'id' ? Memo.id(tx.withdraw_memo) : tx.withdraw_memo_type === 'hash' ? Memo.hash(Buffer.from(tx.withdraw_memo, 'base64').toString('hex')) : Memo.text(tx.withdraw_memo)
       await submitWithMemo(me, tx.withdraw_anchor_account, tx.amount_in, memo)
       onStatus('Sent. Waiting for the anchor to pay out…')
     } else if (tx.status === 'completed') {
-      onStatus(kind === 'deposit' ? `Received ${tx.amount_out ?? tx.amount_in} USDC.` : 'Cash-out complete.')
+      if (kind === 'deposit') {
+        const got = (await anchorBalance(me.pub)) ?? 0
+        if (got > 0) { onStatus('Moving it into your savings balance…'); await moveToSavings(me, got) }
+      }
+      onStatus(kind === 'deposit' ? 'Deposit received and added to your balance.' : 'Cash-out complete.')
       return
     } else if (['error', 'expired', 'refunded', 'no_market', 'too_small', 'too_large'].includes(tx.status)) {
       throw new Error(`The anchor reported "${tx.status}". ${tx.message ?? ''}`)

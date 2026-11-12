@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { cleanCode, dueAt, isCode, isFull, joinCircle, nameOf, seatOrder, showCode, type Circle } from '../ajo'
 import { joinProtected } from '../protected'
-import { Avatar, ErrorNote, Skeleton, day, go, useAction, usdc } from '../ui'
+import { Avatar, ErrorNote, Skeleton, day, go, useAction, naira } from '../ui'
 import { useCircles, useWallet } from '../wallet'
 import { saveName, savedName } from './NewCircle'
 
@@ -57,7 +57,7 @@ function Preview({ code }: { code: string }) {
         <div>
           <p className="small muted mono">{showCode(code)}</p>
           <h1>{c.name}</h1>
-          <p className="sub">Organised by {nameOf(c, c.creator)} · {usdc(c.amount)} {c.freq} · {c.members.length} of {c.size} seats taken</p>
+          <p className="sub">Organised by {nameOf(c, c.creator)} · {naira(c.amount)} {c.freq} · {c.members.length} of {c.size} seats taken</p>
         </div>
       </div>
       <div className="layout">
@@ -83,10 +83,10 @@ function Preview({ code }: { code: string }) {
             }}>
               <p className="section-title">Take seat {seat} of {c.size}</p>
               <dl className="kv" style={{ marginBottom: 'var(--space-lg)' }}>
-                <dt>You pay each round</dt><dd>{usdc(c.amount)}</dd>
-                <dt>Your payout</dt><dd>{usdc(c.amount * (c.size - 1))} in {c.mode === 'draw' ? 'a round drawn when the circle fills' : `round ${seat}`}</dd>
+                <dt>You pay each round</dt><dd>{naira(c.amount)}</dd>
+                <dt>Your payout</dt><dd>{naira(c.amount * (c.size - 1))} in {c.mode === 'draw' ? 'a round drawn when the circle fills' : `round ${seat}`}</dd>
                 <dt>Rounds</dt><dd>{c.size}, {c.freq}</dd>
-                {c.protected && <><dt>Deposit now (refunded)</dt><dd>{usdc(c.protected.deposit)}</dd></>}
+                {c.protected && <><dt>Deposit now (refunded)</dt><dd>{naira(c.protected.deposit)}</dd></>}
               </dl>
               <label className="field">
                 <span className="label">Your name</span>

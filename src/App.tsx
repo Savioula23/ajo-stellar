@@ -6,7 +6,7 @@ import { ScorePage } from './pages/ScorePage'
 import { WalletPage } from './pages/WalletPage'
 import { Welcome } from './pages/Welcome'
 import { savedName } from './pages/NewCircle'
-import { Avatar, Mark, useRoute, usdc } from './ui'
+import { Avatar, Mark, useRoute, naira } from './ui'
 import { useWallet } from './wallet'
 
 export default function App() {
@@ -38,7 +38,7 @@ export default function App() {
           {wallet && (
             <a className="chip" href="#/wallet" aria-label="Wallet balance">
               <Avatar name={savedName() || 'Me'} />
-              <span className="num">{balances ? usdc(balances.usdc) : '…'}</span>
+              <span className="num">{balances ? naira(balances.usdc) : '…'}</span>
               <span className="addr mono muted">{wallet.pub.slice(0, 4)}…{wallet.pub.slice(-4)}</span>
             </a>
           )}
@@ -49,7 +49,7 @@ export default function App() {
         <div className="wrap">
           <span>ajo</span>
           <span>Savings circles settled on Stellar</span>
-          <span>Testnet preview: USDC here is test money</span>
+          <span>Testnet preview: all money here is test money</span>
         </div>
       </footer>
     </>
