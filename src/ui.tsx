@@ -1,3 +1,4 @@
+import QRCode from 'qrcode'
 import { useEffect, useState, type ReactNode } from 'react'
 import { friendlyError } from './ajo'
 
@@ -106,4 +107,20 @@ export function Mark() {
       <circle cx="12" cy="3" r="2.4" fill="currentColor" />
     </svg>
   )
+}
+
+/* ---------- Sharing, reminders, QR ---------- */
+
+export const circleLink = (code: string) => `${location.origin}${location.pathname}#/c/${code}`
+export const scoreLink = (pub: string) => `${location.origin}${location.pathname}#/score/${pub}`
+export const whatsapp = (text: string) => `https://wa.me/?text=${encodeURIComponent(text)}`
+
+export function Qr({ text, label }: { text: string; label: string }) {
+  const [svg, setSvg] = useState('')
+  useEffect(() => {
+    // The library emits black-on-white; recolour to currentColor so the QR follows the theme tokens.
+    QRCode.toString(text, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' })
+      .then((s) => setSvg(s.replace(/#000000/g, 'currentColor').replace(/#ffffff/g, 'transparent')), () => setSvg(''))
+  }, [text])
+  return <div className="qr" role="img" aria-label={label} dangerouslySetInnerHTML={{ __html: svg }} />
 }

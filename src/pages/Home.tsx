@@ -91,7 +91,7 @@ export function Home() {
           <dl className="kv">
             <dt>Wallet balance</dt><dd className="num">{balances ? usdc(balances.usdc) : '—'}</dd>
           </dl>
-          <a className="small" href="#/wallet" style={{ display: 'inline-block', marginTop: 'var(--space-md)' }}>How the score works</a>
+          <a className="small" href={`#/score/${me}`} style={{ display: 'inline-block', marginTop: 'var(--space-md)' }}>View your public record</a>
         </aside>
       </div>
     </>

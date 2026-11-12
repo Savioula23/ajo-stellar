@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Keypair } from '@stellar/stellar-sdk'
-import { connectFreighter, fundTestnet, getBalances, loadCircle, type Circle, type Signer } from './ajo'
+import { connectFreighter, discoverCodes, fundTestnet, getBalances, loadCircle, type Circle, type Signer } from './ajo'
 
 export type Wallet = Signer & { kind: 'local' | 'freighter' }
 type Balances = Awaited<ReturnType<typeof getBalances>>
@@ -42,6 +42,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (wallet) getBalances(wallet.pub).then(setBalances, () => {})
   }, [wallet])
   useEffect(refreshBalances, [refreshBalances])
+
+  // Rebuild the circle list from this wallet's ledger history, so a new device sees the same circles.
+  useEffect(() => {
+    if (!wallet) return
+    discoverCodes(wallet.pub).then((found) => setCodes((prev) => {
+      const next = [...prev, ...found.filter((c) => !prev.includes(c))]
+      write(codesKey(wallet.pub), next)
+      return next
+    }), () => {})
+  }, [wallet])
 
   const value: Ctx = {
     wallet, balances, refreshBalances, codes,

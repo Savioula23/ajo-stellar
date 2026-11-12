@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { cleanCode, dueAt, isCode, isFull, joinCircle, nameOf, showCode, type Circle } from '../ajo'
+import { cleanCode, dueAt, isCode, isFull, joinCircle, nameOf, seatOrder, showCode, type Circle } from '../ajo'
 import { Avatar, ErrorNote, Skeleton, day, go, useAction, usdc } from '../ui'
 import { useCircles, useWallet } from '../wallet'
 import { saveName, savedName } from './NewCircle'
@@ -79,7 +79,7 @@ function Preview({ code }: { code: string }) {
               <p className="section-title">Take seat {seat} of {c.size}</p>
               <dl className="kv" style={{ marginBottom: 'var(--space-lg)' }}>
                 <dt>You pay each round</dt><dd>{usdc(c.amount)}</dd>
-                <dt>Your payout</dt><dd>{usdc(c.amount * (c.size - 1))} in round {seat}</dd>
+                <dt>Your payout</dt><dd>{usdc(c.amount * (c.size - 1))} in {c.mode === 'draw' ? 'a round drawn when the circle fills' : `round ${seat}`}</dd>
                 <dt>Rounds</dt><dd>{c.size}, {c.freq}</dd>
               </dl>
               <label className="field">
@@ -100,14 +100,14 @@ function Preview({ code }: { code: string }) {
             {c.members.map((m, i) => (
               <li className="person" key={m}>
                 <Avatar name={nameOf(c, m)} />
-                <div><div className="name">{nameOf(c, m)}</div><div className="sub">Round {i + 1}{c.startedAt ? ` · ${day(dueAt(c, i))}` : ''}</div></div>
+                <div><div className="name">{nameOf(c, m)}</div><div className="sub">{c.mode === 'draw' && !isFull(c) ? `Joined #${i + 1}` : `Round ${seatOrder(c).indexOf(m) + 1}`}{c.startedAt ? ` · ${day(dueAt(c, seatOrder(c).indexOf(m)))}` : ''}</div></div>
                 {m === c.creator ? <span className="pill">Organiser</span> : <span />}
               </li>
             ))}
             {Array.from({ length: c.size - c.members.length }, (_, i) => (
               <li className="person" key={'open' + i}>
                 <span className="avatar" aria-hidden="true">·</span>
-                <div><div className="name muted">Open seat</div><div className="sub">Round {c.members.length + i + 1}</div></div>
+                <div><div className="name muted">Open seat</div><div className="sub">{c.mode === 'draw' ? 'Round drawn later' : `Round ${c.members.length + i + 1}`}</div></div>
                 <span />
               </li>
             ))}

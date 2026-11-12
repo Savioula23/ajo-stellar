@@ -210,3 +210,9 @@ details[open] summary { margin-bottom: var(--space-sm); }
   *, *::before { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- QR + pass layout ---------- */
+.pass-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-md); align-items: start; }
+.qr { width: 104px; padding: var(--space-xs); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-ink); line-height: 0; }
+.qr svg { width: 100%; height: auto; }
+.share-row { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-md); }

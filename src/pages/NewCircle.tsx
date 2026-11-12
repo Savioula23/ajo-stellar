@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createCircle, PERIOD_MS, type Freq } from '../ajo'
+import { createCircle, feeOf, PERIOD_MS, type Freq, type OrderMode } from '../ajo'
 import { ErrorNote, go, useAction, usdc } from '../ui'
 import { useWallet } from '../wallet'
 
@@ -16,11 +16,12 @@ export function NewCircle() {
   const [amount, setAmount] = useState('20')
   const [size, setSize] = useState(5)
   const [freq, setFreq] = useState<Freq>('weekly')
+  const [mode, setMode] = useState<OrderMode>('join')
   const amt = Number(amount) || 0
   const days = Math.round((PERIOD_MS[freq] * size) / 864e5)
 
   const submit = () => run('create', async () => {
-    const code = await createCircle(wallet!, { name, you, amount: amt, size, freq })
+    const code = await createCircle(wallet!, { name, you, amount: amt, size, freq, mode })
     saveName(you)
     addCode(code)
     go(`/c/${code}`)
@@ -64,6 +65,20 @@ export function NewCircle() {
               ))}
             </div>
           </div>
+          <div className="field">
+            <span className="label" id="order">Payout order</span>
+            <div className="seg" role="radiogroup" aria-labelledby="order">
+              {([['join', 'Join order'], ['draw', 'Random draw']] as const).map(([v, l]) => (
+                <label key={v}>
+                  <input type="radio" name="order" value={v} checked={mode === v} onChange={() => setMode(v)} />
+                  <span>{l}</span>
+                </label>
+              ))}
+            </div>
+            <span className="hint">{mode === 'draw'
+              ? 'Drawn from the ledger when the last seat fills. Anyone can re-check the draw.'
+              : 'First to join is paid first. You, as organiser, take round 1.'}</span>
+          </div>
           <label className="field">
             <span className="label">Members, including you</span>
             <select className="input" value={size} onChange={(e) => setSize(Number(e.target.value))}>
@@ -84,11 +99,12 @@ export function NewCircle() {
             <dt>Rounds</dt><dd>{size}, one per {unit[freq]}</dd>
             <dt>Full cycle</dt><dd>about {days} days</dd>
             <dt>You pay in total</dt><dd>{usdc(amt * (size - 1))}</dd>
-            <dt>You receive</dt><dd>{usdc(amt * (size - 1))}, once</dd>
+            <dt>You receive</dt><dd>{usdc(amt * (size - 1) - feeOf(amt * (size - 1)))}, once</dd>
+            <dt>Service fee</dt><dd>0.5% of your payout</dd>
           </dl>
           <div className="divider" />
           <p className="small muted">
-            Payout order follows join order, and as the organiser you take round 1. Creating the circle sets up its
+            {mode === 'draw' ? 'Payout order is drawn when the circle fills.' : 'Payout order follows join order, and as the organiser you take round 1.'} Creating the circle sets up its
             own Stellar account (about 5 test XLM for the network reserve). The code then finds that account, but nobody can control it with the code.
           </p>
         </aside>

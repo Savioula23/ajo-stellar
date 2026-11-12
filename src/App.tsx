@@ -2,6 +2,7 @@ import { CircleView } from './pages/CircleView'
 import { Home } from './pages/Home'
 import { JoinPage } from './pages/Join'
 import { NewCircle } from './pages/NewCircle'
+import { ScorePage } from './pages/ScorePage'
 import { WalletPage } from './pages/WalletPage'
 import { Welcome } from './pages/Welcome'
 import { savedName } from './pages/NewCircle'
@@ -14,7 +15,8 @@ export default function App() {
   const [, page = '', arg] = route.split('/')
 
   let body
-  if (!wallet) body = <Welcome route={route} />
+  if (page === 'score' && arg) body = <ScorePage pub={arg} />
+  else if (!wallet) body = <Welcome route={route} />
   else if (page === 'new') body = <NewCircle />
   else if (page === 'join') body = <JoinPage code={arg} />
   else if (page === 'c' && arg) body = <CircleView code={arg} />

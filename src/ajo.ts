@@ -18,6 +18,11 @@ const issuer = derive('ajo:demo-usdc:v1')
 export const USDC = new Asset('USDC', issuer.publicKey())
 const DUST = '0.0000001' // XLM attached to every circle event so it lands in the circle account's history
 
+// shortcut: the fee rides in the app's claim transaction, so a modified client could skip it; the Soroban contract is where it becomes enforceable.
+export const TREASURY: string = (import.meta as any).env?.VITE_TREASURY || 'GBOWBC2K3H6GY6CNLDAJR6OSRSGJ7EYQEHWV7BXFSIAQXTCQIQJL4OUP'
+export const FEE_BPS = 50 // 0.5% of each payout
+export const feeOf = (total: number) => Math.round(total * FEE_BPS) / 10000
+
 export async function submit(who: Signer, ops: any[], memo?: string, cosigners: Keypair[] = []) {
   const tb = new TransactionBuilder(await server.loadAccount(who.pub), { fee: BASE_FEE, networkPassphrase: NETWORK })
   ops.forEach((o) => tb.addOperation(o))
@@ -81,6 +86,7 @@ const circleKeys = (code: string) => derive('ajo:circle:v1:' + code)
 /* ---------- Circle protocol ---------- */
 
 export type Freq = 'daily' | 'weekly' | 'monthly'
+export type OrderMode = 'join' | 'draw'
 export const PERIOD_MS: Record<Freq, number> = { daily: 864e5, weekly: 7 * 864e5, monthly: 30 * 864e5 }
 
 export type CircleEvent = { kind: 'create' | 'join' | 'pay' | 'out'; who: string; round?: number; hash: string; at: number; late?: boolean }
@@ -88,6 +94,8 @@ export type CircleEvent = { kind: 'create' | 'join' | 'pay' | 'out'; who: string
 export type Circle = {
   code: string; account: string; name: string; amount: number; size: number; freq: Freq; creator: string
   members: string[]; waitlist: string[]; names: Record<string, string>
+  mode: OrderMode
+  order: string[]          // payout order, set when the last seat fills
   paid: string[][]          // paid[r] = members who paid round r
   payouts: (CircleEvent | undefined)[]
   round: number             // current round index; === size when complete
@@ -107,13 +115,15 @@ export const pot = (c: Circle) => c.amount * (c.size - 1)
 export const dueAt = (c: Circle, r: number) => (c.startedAt ? c.startedAt + (r + 1) * PERIOD_MS[c.freq] : undefined)
 export const isFull = (c: Circle) => c.members.length >= c.size
 export const isDone = (c: Circle) => c.round >= c.size
-export const recipientOf = (c: Circle) => (isDone(c) ? undefined : c.members[c.round])
+export const recipientOf = (c: Circle) => (isDone(c) || !isFull(c) ? undefined : c.order[c.round])
+/** Payout order once known; before the circle fills, join order (or nothing yet for a draw). */
+export const seatOrder = (c: Circle) => (isFull(c) ? c.order : c.mode === 'draw' ? [] : c.members)
 export const owes = (c: Circle, pub: string) =>
   isFull(c) && !isDone(c) && c.members.includes(pub) && pub !== recipientOf(c) && !c.paid[c.round].includes(pub)
 export const canClaim = (c: Circle, pub: string) =>
   isFull(c) && !isDone(c) && pub === recipientOf(c) && c.paid[c.round].length === c.size - 1
 
-export async function createCircle(me: Signer, opts: { name: string; you: string; amount: number; size: number; freq: Freq }) {
+export async function createCircle(me: Signer, opts: { name: string; you: string; amount: number; size: number; freq: Freq; mode?: OrderMode }) {
   if (!opts.name.trim()) throw new Error('Give the circle a name.')
   if (!opts.you.trim()) throw new Error('Add your name so members know who you are.')
   if (!(opts.amount > 0)) throw new Error('Contribution must be more than 0.')
@@ -123,9 +133,10 @@ export async function createCircle(me: Signer, opts: { name: string; you: string
   if (await exists(c.publicKey())) throw new Error('Code collision. Please try again.')
   const data: Record<string, string> = {
     v: '1', name: opts.name.trim().slice(0, 40), amount: String(opts.amount), size: String(opts.size), freq: opts.freq,
+    code, order: opts.mode ?? 'join',
   }
   await submit(me, [
-    Operation.createAccount({ destination: c.publicKey(), startingBalance: '5' }),
+    Operation.createAccount({ destination: c.publicKey(), startingBalance: '6' }),
     ...Object.entries(data).map(([k, v]) => Operation.manageData({ source: c.publicKey(), name: 'ajo.' + k, value: v })),
     Operation.setOptions({
       source: c.publicKey(), signer: { ed25519PublicKey: me.pub, weight: 1 },
@@ -149,7 +160,7 @@ export async function loadCircle(code: string): Promise<Circle | null> {
   const size = Number(data('size'))
   const c: Circle = {
     code, account, name: data('name'), amount: Number(data('amount')), size, freq: (data('freq') || 'weekly') as Freq,
-    creator: '', members: [], waitlist: [], names: {}, paid: Array.from({ length: size }, () => []), payouts: [], round: 0, events: [],
+    creator: '', members: [], waitlist: [], names: {}, mode: data('order') === 'draw' ? 'draw' : 'join', order: [], paid: Array.from({ length: size }, () => []), payouts: [], round: 0, events: [],
   }
   for (const tx of txs) {
     if (!tx.successful) continue
@@ -165,7 +176,10 @@ export async function loadCircle(code: string): Promise<Circle | null> {
     } else if (kind === 'join' && c.creator && !c.members.includes(who)) {
       if (c.members.length < size) {
         c.members.push(who); c.names[who] = arg
-        if (c.members.length === size) c.startedAt = at
+        if (c.members.length === size) {
+          c.startedAt = at
+          c.order = c.mode === 'draw' ? await drawOrder(c.members, tx.ledger_attr ?? tx.ledger) : [...c.members]
+        }
         c.events.push({ kind: 'join', who, hash: tx.hash, at })
       } else if (!c.waitlist.includes(who)) c.waitlist.push(who)
     } else if (kind === 'pay' && round === c.round && owes(c, who)) {
@@ -179,6 +193,31 @@ export async function loadCircle(code: string): Promise<Circle | null> {
   }
   c.events.reverse()
   return c
+}
+
+// Random payout order that anyone can re-derive: members sorted by sha256(ledger hash + address), using the
+// ledger in which the last seat filled. shortcut: the last joiner could retry to influence which ledger that is; use the contract's PRNG for stakes that matter.
+async function drawOrder(members: string[], ledger: number) {
+  const seed = (await server.ledgers().ledger(ledger).call() as any).hash as string
+  const key = (m: string) => Buffer.from(hash(Buffer.from(seed + m))).toString('hex')
+  return [...members].sort((a, b) => (key(a) < key(b) ? -1 : 1))
+}
+
+/** Circles this wallet created or joined, found from its own ledger history, so any device can rebuild the list. */
+export async function discoverCodes(pub: string) {
+  const ops = await server.operations().forAccount(pub).order('desc').limit(200).call()
+  const accounts = new Set<string>()
+  for (const o of ops.records as any[]) {
+    if (o.type === 'create_account' && o.funder === pub) accounts.add(o.account)
+    if (o.type === 'payment' && o.from === pub && o.asset_type === 'native' && Number(o.amount) === Number(DUST)) accounts.add(o.to)
+  }
+  const found = await Promise.all([...accounts].map(async (a) => {
+    const acc: any = await server.loadAccount(a).catch(() => null)
+    const raw = acc?.data_attr?.['ajo.code']
+    const code = raw ? Buffer.from(raw, 'base64').toString() : ''
+    return isCode(code) && circleKeys(code).publicKey() === a ? code : null // must really derive to that account
+  }))
+  return found.filter((c): c is string => !!c)
 }
 
 export const joinCircle = (me: Signer, c: Circle, name: string) => {
@@ -207,11 +246,14 @@ export async function claimPot(me: Signer, c: Circle) {
     if (payers.has(b.sponsor) && Number(b.amount) === c.amount) { picks.push(b); payers.delete(b.sponsor) }
   }
   if (!picks.length) throw new Error('No locked contributions found for you.')
+  const total = picks.length * c.amount
+  const fee = feeOf(total)
   const h = await submit(me, [
     ...picks.map((b) => Operation.claimClaimableBalance({ balanceId: b.id })),
+    ...(fee > 0 ? [Operation.payment({ destination: TREASURY, asset: USDC, amount: fee.toFixed(7) })] : []),
     Operation.payment({ destination: c.account, asset: Asset.native(), amount: DUST }),
   ], `out:${c.round}`)
-  return { hash: h, total: picks.length * c.amount }
+  return { hash: h, total, fee }
 }
 
 /* ---------- Ajo Score ---------- */

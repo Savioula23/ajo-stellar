@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ANCHOR_DOMAIN, anchorBalance, startTransfer } from '../anchor'
 import { ajoScore, explorerAccount, getTestUsdc, type Circle } from '../ajo'
-import { CopyButton, ErrorNote, go, useAction, usdc } from '../ui'
+import { CopyButton, ErrorNote, go, scoreLink, useAction, usdc } from '../ui'
 import { useCircles, useWallet } from '../wallet'
 
 export function WalletPage() {
@@ -42,6 +43,8 @@ export function WalletPage() {
             </div>
           </section>
 
+          <CashPanel />
+
           <section className="card" aria-labelledby="score">
             <h2 className="section-title" id="score">Ajo Score</h2>
             <div className="score">
@@ -58,8 +61,12 @@ export function WalletPage() {
             <p className="small muted" style={{ marginTop: 'var(--space-md)' }}>
               Starts at 500. Each on-time payment adds 25, each late payment takes 40, and each completed circle adds 20,
               kept between 300 and 850. It is calculated from public ledger records, so anyone can check it.
-              This preview counts the circles saved on this device.
+              Circles are found from your wallet's ledger history, so lenders can verify the same number.
             </p>
+            <div className="actions" style={{ marginTop: 'var(--space-md)' }}>
+              <CopyButton text={scoreLink(w.pub)} label="Copy shareable score link" />
+              <a className="btn btn-ghost btn-sm" href={`#/score/${w.pub}`}>Open public record</a>
+            </div>
           </section>
         </div>
 
@@ -93,5 +100,41 @@ export function WalletPage() {
         </aside>
       </div>
     </>
+  )
+}
+
+/** Money in and out through a Stellar anchor (SEP-10 sign-in + SEP-24 hosted KYC and bank details). */
+function CashPanel() {
+  const { wallet } = useWallet()
+  const { busy, error, run } = useAction()
+  const [status, setStatus] = useState('')
+  const [bal, setBal] = useState<number | null>(null)
+  const refresh = () => anchorBalance(wallet!.pub).then(setBal, () => {})
+  useEffect(() => { refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const go = (kind: 'deposit' | 'withdraw') => {
+    const popup = window.open('about:blank', 'ajo-anchor', 'width=480,height=720') // must open inside the click
+    run(kind, async () => {
+      try { await startTransfer(wallet!, kind, popup, setStatus) } finally { refresh() }
+    })
+  }
+
+  return (
+    <section className="card" aria-labelledby="cash">
+      <h2 className="section-title" id="cash">Add money or cash out</h2>
+      <p className="small muted">
+        Bank transfers in and out go through an anchor, a licensed company that swaps local currency for USDC on Stellar.
+        This preview uses the Stellar Development Foundation's test anchor ({ANCHOR_DOMAIN}), with its test KYC form and fake bank.
+      </p>
+      <dl className="kv" style={{ marginTop: 'var(--space-md)' }}>
+        <dt>Anchor USDC balance</dt><dd>{bal === null ? 'not set up yet' : usdc(bal)}</dd>
+      </dl>
+      <div className="actions" style={{ marginTop: 'var(--space-md)' }}>
+        <button className="btn btn-ghost" disabled={!!busy} aria-busy={busy === 'deposit'} onClick={() => go('deposit')}>Add money</button>
+        <button className="btn btn-ghost" disabled={!!busy || !bal} aria-busy={busy === 'withdraw'} onClick={() => go('withdraw')}>Cash out</button>
+      </div>
+      {status && <p className="small" role="status" style={{ marginTop: 'var(--space-sm)' }}>{status}</p>}
+      <ErrorNote>{error}</ErrorNote>
+    </section>
   )
 }
