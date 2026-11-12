@@ -34,6 +34,14 @@ export async function connectPasskeyWallet() {
   return { pub: c.contractId as string, keyId: c.keyIdBase64 as string }
 }
 
+/** Sign one Soroban authorization entry (e.g. an anchor's SEP-45 challenge) with the passkey. */
+export async function signAuthEntry(me: { pub: string; keyId?: string }, entry: any) {
+  const k = await kit()
+  if (k.contractId !== me.pub) await k.connectWallet({ keyId: me.keyId })
+  const { sequence } = await new rpc.Server(RPC_URL).getLatestLedger()
+  return k.signAuthEntry(entry, undefined, { expiration: sequence + 60 })
+}
+
 /** Sign an assembled contract call with the passkey, relay it, and return the call's result. */
 export async function signAndRelay(me: { pub: string; keyId?: string }, tx: any) {
   const k = await kit()

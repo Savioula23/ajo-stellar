@@ -49,8 +49,9 @@ export async function connectFreighter() {
   return a.address
 }
 
-const sac = (source: string, sign = false) => contract.Client.from({
-  contractId: USDC.contractId(NETWORK), networkPassphrase: NETWORK, rpcUrl: 'https://soroban-testnet.stellar.org', publicKey: source,
+/** A Stellar asset contract client; `sign` makes the demo issuer sign (minting, reserve payouts). */
+export const sac = (source: string, sign = false, contractId = USDC.contractId(NETWORK)) => contract.Client.from({
+  contractId, networkPassphrase: NETWORK, rpcUrl: 'https://soroban-testnet.stellar.org', publicKey: source,
   ...(sign ? { signTransaction: contract.basicNodeSigner(issuer, NETWORK).signTransaction } : {}),
 }) as Promise<any>
 

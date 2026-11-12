@@ -1,12 +1,14 @@
 // Vercel function: submits passkey-wallet transactions through OpenZeppelin Channels, which pays the fees.
 // The API key stays on the server. Only calls to the Ajo contract, the savings-USDC contract and passkey-wallet
 // deployments are forwarded, so the key cannot be used to pay for anything else.
-import { Networks, StrKey, TransactionBuilder, xdr } from '@stellar/stellar-sdk'
+import { Asset, Networks, StrKey, TransactionBuilder, xdr } from '@stellar/stellar-sdk'
 import { PasskeyServer } from 'passkey-kit/server'
 
 const NETWORK = Networks.TESTNET
 const AJO_CONTRACT = process.env.VITE_AJO_CONTRACT || 'CD3DQJD4NVU2OHGM4LTRUMJAH6XK2LFGGE3ZRZTRUH7XJ37VZ4K36BFT'
 const USDC_SAC = process.env.VITE_USDC_SAC || 'CDUOS2DVLQUE5RHAYH77PE7H5TVESRXVWSDIKSEL3U3XD25GRKNTHMLQ'
+// Circle's testnet USDC, which the anchor pays out: passkey wallets move it into savings and back to the anchor.
+const ANCHOR_SAC = new Asset('USDC', 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5').contractId(NETWORK)
 export const WALLET_WASM = '97ce047884106b1c6c3bb40b8973cc48db1c4dad95c9e20462bf2c701daa764e'
 
 /** Throws unless the transaction is exactly one allowed host-function call. */
@@ -18,7 +20,7 @@ export function checkAllowed(txXdr: string) {
   switch (fn.switch().name) {
     case 'hostFunctionTypeInvokeContract': {
       const to = StrKey.encodeContract(fn.invokeContract().contractAddress().contractId() as any)
-      if (to !== AJO_CONTRACT && to !== USDC_SAC) throw new Error('That contract is not relayed.')
+      if (![AJO_CONTRACT, USDC_SAC, ANCHOR_SAC].includes(to)) throw new Error('That contract is not relayed.')
       return
     }
     case 'hostFunctionTypeCreateContractV2': {

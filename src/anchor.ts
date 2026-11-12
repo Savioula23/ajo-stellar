@@ -1,6 +1,8 @@
 import { Buffer } from 'buffer'
-import { Asset, Keypair, Memo, Operation, StellarToml, TransactionBuilder, WebAuth } from '@stellar/stellar-sdk'
-import { NETWORK, USDC, getBalances, issuer, server, submit, type Signer } from './ajo.ts'
+import { Address, Asset, Keypair, Memo, Operation, StellarToml, TransactionBuilder, WebAuth, scValToNative, xdr } from '@stellar/stellar-sdk'
+import { VarArray } from '@stellar/js-xdr'
+import { NETWORK, USDC, getBalances, issuer, sac, server, submit, type Signer } from './ajo.ts'
+import { signAndRelay, signAuthEntry } from './passkey.ts'
 
 // shortcut: SDF's public test anchor. For launch, point ANCHOR_DOMAIN at a licensed naira anchor; the SEP-10/24 flow is identical.
 export const ANCHOR_DOMAIN = 'testanchor.stellar.org'
@@ -17,9 +19,41 @@ async function signXdr(me: Signer, xdr: string) {
   return r.signedTxXdr
 }
 
+const ANCHOR_SAC = ANCHOR_USDC.contractId(NETWORK)
+const entries = new VarArray(xdr.SorobanAuthorizationEntry as any, 0xffffffff) as any
+
+/**
+ * SEP-45: sign in a smart-contract (passkey) wallet. The anchor sends authorization entries for its web-auth
+ * contract; we check they are exactly that call for this account and domain, then sign ours with the passkey.
+ */
+async function loginContract(me: Signer, t: any) {
+  const q = new URLSearchParams({ account: me.pub, home_domain: ANCHOR_DOMAIN })
+  const got = await fetch(`${t.WEB_AUTH_FOR_CONTRACTS_ENDPOINT}?${q}`).then((r) => r.json())
+  const list: any[] = entries.fromXDR(Buffer.from(got.authorizationEntries ?? got.authorization_entries, 'base64'))
+  const signed = await Promise.all(list.map(async (e) => {
+    const fn = e.rootInvocation().function().contractFn()
+    const args = scValToNative(fn.args()[0])
+    if (Address.fromScAddress(fn.contractAddress()).toString() !== t.WEB_AUTH_CONTRACT_ID || fn.functionName().toString() !== 'web_auth_verify'
+      || args.account !== me.pub || args.home_domain !== ANCHOR_DOMAIN || args.web_auth_domain_account !== t.SIGNING_KEY
+      || e.rootInvocation().subInvocations().length) throw new Error('The anchor sent an unexpected sign-in request.')
+    const c = e.credentials()
+    const mine = c.switch().name === 'sorobanCredentialsAddress' && Address.fromScAddress(c.address().address()).toString() === me.pub
+    return mine ? signAuthEntry(me, e) : e
+  }))
+  // XDR array: 4-byte big-endian count, then each entry (js-xdr's VarArray writer rejects this list).
+  const count = Buffer.alloc(4); count.writeUInt32BE(signed.length)
+  const body = Buffer.concat([count, ...signed.map((e: any) => e.toXDR())]).toString('base64')
+  const out = await fetch(t.WEB_AUTH_FOR_CONTRACTS_ENDPOINT, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ authorization_entries: body, authorizationEntries: body }),
+  }).then((r) => r.json())
+  if (!out.token) throw new Error(out.error || 'The anchor did not accept the passkey sign-in.')
+  return { token: out.token as string, transfer: t.TRANSFER_SERVER_SEP0024 as string }
+}
+
 /** SEP-10: prove we own the account and get a session token from the anchor. */
 async function login(me: Signer) {
   const t: any = await info()
+  if (me.keyId) return loginContract(me, t)
   const res = await fetch(`${t.WEB_AUTH_ENDPOINT}?account=${me.pub}`)
   const { transaction } = await res.json()
   // Refuse anything that is not a genuine challenge signed by the anchor's published key.
@@ -33,6 +67,7 @@ async function login(me: Signer) {
 }
 
 export async function anchorBalance(pub: string) {
+  if (pub.startsWith('C')) return Number((await (await sac(issuer.publicKey(), false, ANCHOR_SAC)).balance({ id: pub })).result) / 1e7
   const acc: any = await server.loadAccount(pub).catch(() => null)
   const b = acc?.balances.find((x: any) => x.asset_code === ANCHOR_USDC.code && x.asset_issuer === ANCHOR_ISSUER)
   return b ? Number(b.balance) : null // null = no trustline yet
@@ -47,6 +82,17 @@ async function swap(me: Signer, amount: number, toSavings: boolean) {
   const amt = amount.toFixed(7)
   if ((await anchorBalance(issuer.publicKey())) === null) {
     await submit({ pub: issuer.publicKey(), secret: issuer.secret() }, [Operation.changeTrust({ asset: ANCHOR_USDC })])
+  }
+  if (me.keyId) {
+    // A contract wallet cannot join a classic multi-op transaction, so this is two contract calls.
+    // shortcut: not atomic; the reserve pays first so a failed second step never costs the user (testnet money only).
+    const units = BigInt(Math.round(amount * 1e7))
+    const [give, get] = toSavings ? [ANCHOR_SAC, USDC.contractId(NETWORK)] : [USDC.contractId(NETWORK), ANCHOR_SAC]
+    const pay = toSavings
+      ? await (await sac(issuer.publicKey(), true)).mint({ to: me.pub, amount: units })
+      : await (await sac(issuer.publicKey(), true, get)).transfer({ from: issuer.publicKey(), to: me.pub, amount: units })
+    await pay.signAndSend()
+    return signAndRelay(me, await (await sac(issuer.publicKey(), false, give)).transfer({ from: me.pub, to: issuer.publicKey(), amount: units }))
   }
   const [give, get] = toSavings ? [ANCHOR_USDC, USDC] : [USDC, ANCHOR_USDC]
   const trustUsdc = toSavings && !(await getBalances(me.pub))?.trusted ? [Operation.changeTrust({ asset: USDC })] : []
@@ -65,7 +111,7 @@ export const swapOut = (me: Signer, amount: number) => swap(me, amount, false)
  * send the USDC to the anchor with the memo it asks for.
  */
 export async function startTransfer(me: Signer, kind: 'deposit' | 'withdraw', popup: Window | null, onStatus: (s: string) => void) {
-  if ((await anchorBalance(me.pub)) === null) {
+  if (!me.keyId && (await anchorBalance(me.pub)) === null) { // contract wallets need no trustline
     onStatus('Adding USDC to your wallet…')
     await submit(me, [Operation.changeTrust({ asset: ANCHOR_USDC })])
   }
@@ -83,16 +129,28 @@ export async function startTransfer(me: Signer, kind: 'deposit' | 'withdraw', po
   else window.open(r.url, '_blank')
   onStatus('Finish the steps in the anchor window…')
 
+  let sent = false // the anchor may still report pending_user_transfer_start on the next poll; pay only once
   for (let i = 0; i < 120; i++) { // up to ~10 minutes
     await new Promise((res) => setTimeout(res, 5000))
     const { transaction: tx } = await fetch(`${transfer}/transaction?id=${r.id}`, { headers: { Authorization: `Bearer ${token}` } }).then((x) => x.json())
     if (!tx) continue
-    if (kind === 'withdraw' && tx.status === 'pending_user_transfer_start') {
+    if (kind === 'withdraw' && tx.status === 'pending_user_transfer_start' && !sent) {
+      sent = true
       const short = Number(tx.amount_in) - ((await anchorBalance(me.pub)) ?? 0)
-      if (short > 0) { onStatus('Moving money out of savings…'); await swap(me, short, false) }
+      if (short > 0) {
+        const savings = (await getBalances(me.pub))?.usdc ?? 0
+        if (savings + 1e-7 < short) throw new Error(`The anchor asked for ${tx.amount_in} USDC but your savings hold ${savings.toFixed(2)}. Start the cash-out again with a smaller amount.`)
+        onStatus('Moving money out of savings…'); await swap(me, short, false)
+      }
       onStatus(`Sending ${tx.amount_in} USDC to the anchor…`)
-      const memo = tx.withdraw_memo_type === 'id' ? Memo.id(tx.withdraw_memo) : tx.withdraw_memo_type === 'hash' ? Memo.hash(Buffer.from(tx.withdraw_memo, 'base64').toString('hex')) : Memo.text(tx.withdraw_memo)
-      await submitWithMemo(me, tx.withdraw_anchor_account, tx.amount_in, memo)
+      if (me.keyId) {
+        // Contract wallets pay with a token transfer, which carries no memo; SEP-45 anchors match it by sender.
+        const units = BigInt(Math.round(Number(tx.amount_in) * 1e7))
+        await signAndRelay(me, await (await sac(issuer.publicKey(), false, ANCHOR_SAC)).transfer({ from: me.pub, to: tx.withdraw_anchor_account, amount: units }))
+      } else {
+        const memo = tx.withdraw_memo_type === 'id' ? Memo.id(tx.withdraw_memo) : tx.withdraw_memo_type === 'hash' ? Memo.hash(Buffer.from(tx.withdraw_memo, 'base64').toString('hex')) : Memo.text(tx.withdraw_memo)
+        await submitWithMemo(me, tx.withdraw_anchor_account, tx.amount_in, memo)
+      }
       onStatus('Sent. Waiting for the anchor to pay out…')
     } else if (tx.status === 'completed') {
       if (kind === 'deposit') {

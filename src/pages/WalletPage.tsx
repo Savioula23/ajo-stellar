@@ -43,9 +43,7 @@ export function WalletPage() {
             </div>
           </section>
 
-          {w.keyId
-            ? <section className="card"><h2 className="section-title">Add money or cash out</h2><p className="small muted">Bank deposits and cash-outs need a classic Stellar account today. Use a key or Freighter wallet for them; passkey support comes with a naira anchor that accepts smart wallets (SEP-45).</p></section>
-            : <CashPanel />}
+          <CashPanel />
 
           <section className="card" aria-labelledby="score">
             <h2 className="section-title" id="score">Ajo Score</h2>
