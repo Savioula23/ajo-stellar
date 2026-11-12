@@ -1,3 +1,4 @@
 [
+  { "date": "2026-11-12", "macrostructure": "App shell (multi-page product)", "theme": "custom", "theme_axes": "light / grotesk-sans / cool", "vibe": "adire indigo on warm paper, fintech calm", "enrichment": "Tier B hand-built SVG adire motif on invite pass", "nav": "N1b", "footer": "Ft2", "brief": "Ajo web app · circles, invite codes, wallet, score" },
   { "date": "2026-11-12", "macrostructure": "Map / Diagram", "theme": "custom", "theme_axes": "dark / geometric-sans / chromatic-other", "vibe": "midnight ajo, mint ledger glow", "enrichment": "Tier B hand-built SVG ring", "nav": "N9", "footer": "Ft5", "brief": "Ajo · on-chain savings circles on Stellar" }
 ]

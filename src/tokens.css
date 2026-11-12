@@ -1,36 +1,47 @@
-/* Hallmark · genre: atmospheric · macrostructure: Map / Diagram · theme: custom
- * vibe: "midnight ajo, mint ledger glow" · paper oklch(15% 0.02 165) · accent oklch(84% 0.19 160) mint
- * display: Bricolage Grotesque 700 · body: Geist · mono: Geist Mono
- * axes: dark / geometric-sans / chromatic-other · nav: N9 · footer: Ft5 · enrichment: Tier B hand-built SVG ring
+/* Hallmark · genre: modern-minimal · macrostructure: app shell (component-scope pages) · theme: custom
+ * vibe: "adire indigo on warm paper, fintech calm"
+ * paper oklch(98.4% 0.006 85) · accent oklch(43% 0.16 268) adire indigo
+ * display: Schibsted Grotesk 700/800 · body: Geist · numbers: Geist Mono (tabular)
+ * axes: light / grotesk-sans / cool · nav: N1b app bar · footer: Ft2 inline
  */
 :root {
-  --color-paper: oklch(15% 0.02 165);
-  --color-paper-2: oklch(20% 0.025 165);
-  --color-paper-3: oklch(26% 0.03 165);
-  --color-ink: oklch(96% 0.01 160);
-  --color-ink-2: oklch(80% 0.02 160);
-  --color-ink-3: oklch(66% 0.02 160);
-  --color-line: oklch(96% 0.01 160 / 0.12);
-  --color-accent: oklch(84% 0.19 160);
-  --color-accent-ink: oklch(18% 0.04 165);
-  --color-accent-glow: oklch(84% 0.19 160 / 0.35);
-  --color-bloom-1: oklch(55% 0.15 160 / 0.30);
-  --color-bloom-2: oklch(50% 0.12 200 / 0.20);
-  --color-coin: oklch(86% 0.15 85);
-  --color-coin-edge: oklch(70% 0.14 75);
-  --color-danger: oklch(74% 0.16 25);
-  --color-focus: oklch(92% 0.14 160);
+  --color-paper: oklch(98.4% 0.006 85);
+  --color-paper-2: oklch(95.8% 0.008 85);
+  --color-surface: oklch(99.6% 0.003 85);
+  --color-line: oklch(90.5% 0.008 85);
+  --color-line-strong: oklch(82% 0.01 85);
 
-  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --color-ink: oklch(21% 0.025 268);
+  --color-ink-2: oklch(40% 0.02 268);
+  --color-ink-3: oklch(52% 0.015 268);
+
+  --color-accent: oklch(43% 0.16 268);
+  --color-accent-hover: oklch(37% 0.15 268);
+  --color-accent-soft: oklch(94.5% 0.025 268);
+  --color-accent-line: oklch(85% 0.06 268);
+  --color-on-accent: oklch(98% 0.01 268);
+  --color-pattern: oklch(47.5% 0.16 268);
+
+  --color-ok: oklch(48% 0.12 155);
+  --color-ok-soft: oklch(95% 0.035 155);
+  --color-warn: oklch(52% 0.12 65);
+  --color-warn-soft: oklch(95.5% 0.045 80);
+  --color-danger: oklch(52% 0.18 27);
+  --color-danger-soft: oklch(95.5% 0.03 27);
+  --color-focus: oklch(55% 0.2 268);
+
+  --font-display: "Schibsted Grotesk", system-ui, sans-serif;
   --font-body: "Geist", system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
 
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
-  --text-lg: 1.25rem;
-  --text-2xl: 2rem;
-  --text-display: clamp(2.75rem, 7vw + 0.5rem, 6.5rem);
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: clamp(2rem, 2.4vw + 1.2rem, 2.75rem);
+  --text-display: clamp(2.5rem, 4.5vw + 1rem, 4.25rem);
 
   --space-2xs: 4px;
   --space-xs: 8px;
@@ -41,14 +52,14 @@
   --space-2xl: 48px;
   --space-3xl: 72px;
 
-  --radius-sm: 8px;
-  --radius-md: 16px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
   --radius-pill: 999px;
 
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-fast: 150ms;
-  --dur-base: 300ms;
-  --dur-slow: 900ms;
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
 }
