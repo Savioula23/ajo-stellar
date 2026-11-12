@@ -7,11 +7,11 @@ import { useCircles } from '../wallet'
 
 /** Public, verifiable score: circles are discovered from the wallet's own ledger history, so none can be hidden. */
 export function ScorePage({ pub }: { pub: string }) {
-  const valid = StrKey.isValidEd25519PublicKey(pub)
+  const valid = StrKey.isValidEd25519PublicKey(pub) || StrKey.isValidContract(pub) // key or passkey wallet
   const [codes, setCodes] = useState<string[] | null>(null)
   const [error, setError] = useState('')
   useEffect(() => {
-    if (valid) Promise.all([discoverCodes(pub), discoverProtected(pub).catch(() => [] as string[])])
+    if (valid) Promise.all([StrKey.isValidContract(pub) ? [] : discoverCodes(pub), discoverProtected(pub).catch(() => [] as string[])])
       .then(([a, b]) => setCodes([...a, ...b]), () => setError('Could not reach the Stellar network.'))
   }, [pub, valid])
   const { circles, loading } = useCircles(codes ?? [], 60000)

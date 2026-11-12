@@ -19,6 +19,7 @@ export function NewCircle() {
   const [freq, setFreq] = useState<Freq>('weekly')
   const [mode, setMode] = useState<OrderMode>('join')
   const [kind, setKind] = useState<'standard' | 'protected'>('protected')
+  const passkey = !!wallet?.keyId
   const [deposit, setDeposit] = useState('')
   const amt = fromNaira(amount) || 0
   const dep = deposit === '' ? amt : fromNaira(deposit) || 0
@@ -49,14 +50,15 @@ export function NewCircle() {
             <div className="seg" role="radiogroup" aria-labelledby="kind">
               {([['protected', 'Protected'], ['standard', 'Standard']] as const).map(([v, l]) => (
                 <label key={v}>
-                  <input type="radio" name="kind" value={v} checked={kind === v} onChange={() => setKind(v)} />
+                  <input type="radio" name="kind" value={v} checked={kind === v} disabled={passkey && v === 'standard'} onChange={() => setKind(v)} />
                   <span>{l}</span>
                 </label>
               ))}
             </div>
             <span className="hint">{kind === 'protected'
               ? 'Runs in the Ajo smart contract. Everyone puts down a refundable deposit that covers a missed payment, and members can bid for an early payout.'
-              : 'No deposit. Payments are locked for each recipient, but nothing covers a member who stops paying.'}</span>
+              : 'No deposit. Payments are locked for each recipient, but nothing covers a member who stops paying.'}
+              {passkey && ' Passkey wallets run protected circles.'}</span>
           </div>
           <label className="field">
             <span className="label">Circle name</span>

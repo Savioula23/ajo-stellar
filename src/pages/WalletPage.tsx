@@ -18,7 +18,7 @@ export function WalletPage() {
       <div className="page-head">
         <div>
           <h1>Wallet</h1>
-          <p className="sub">{w.kind === 'freighter' ? 'Signing with Freighter.' : 'A wallet kept in this browser.'} Stellar testnet.</p>
+          <p className="sub">{w.kind === 'freighter' ? 'Signing with Freighter.' : w.kind === 'passkey' ? 'A smart wallet unlocked by your passkey.' : 'A wallet kept in this browser.'} Stellar testnet.</p>
         </div>
       </div>
       <div className="layout">
@@ -26,7 +26,7 @@ export function WalletPage() {
           <section className="card">
             <p className="small muted">Savings balance</p>
             <p className="balance">{balances ? naira(balances.usdc) : '—'}</p>
-            <p className="small muted" style={{ marginTop: 'var(--space-xs)' }}>{balances ? `${usdc(balances.usdc)} on Stellar at ₦${NGN_PER_USDC.toLocaleString('en-US')} per USDC · ${balances.xlm.toFixed(2)} XLM for network fees` : 'Loading balances…'}</p>
+            <p className="small muted" style={{ marginTop: 'var(--space-xs)' }}>{balances ? `${usdc(balances.usdc)} on Stellar at ₦${NGN_PER_USDC.toLocaleString('en-US')} per USDC · ${w.keyId ? 'network fees paid by Ajo' : `${balances.xlm.toFixed(2)} XLM for network fees`}` : 'Loading balances…'}</p>
             <div className="actions" style={{ marginTop: 'var(--space-lg)' }}>
               <button className="btn btn-accent" disabled={!!faucet.busy} aria-busy={!!faucet.busy}
                 onClick={() => faucet.run('mint', async () => { await getTestUsdc(w); refreshBalances() })}>
@@ -43,7 +43,9 @@ export function WalletPage() {
             </div>
           </section>
 
-          <CashPanel />
+          {w.keyId
+            ? <section className="card"><h2 className="section-title">Add money or cash out</h2><p className="small muted">Bank deposits and cash-outs need a classic Stellar account today. Use a key or Freighter wallet for them; passkey support comes with a naira anchor that accepts smart wallets (SEP-45).</p></section>
+            : <CashPanel />}
 
           <section className="card" aria-labelledby="score">
             <h2 className="section-title" id="score">Ajo Score</h2>
@@ -72,7 +74,9 @@ export function WalletPage() {
 
         <aside className="card">
           <p className="section-title">Security</p>
-          {w.kind === 'freighter' ? (
+          {w.kind === 'passkey' ? (
+            <p className="small muted">Every payment is approved with your passkey (fingerprint, face or screen lock). There is no secret key to lose. Your passkey syncs through your phone's password manager.</p>
+          ) : w.kind === 'freighter' ? (
             <p className="small muted">Every payment is approved in Freighter. Ajo never sees your secret key.</p>
           ) : (
             <>

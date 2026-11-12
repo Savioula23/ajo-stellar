@@ -3,9 +3,10 @@ import { cleanCode, isCode, loadCircle, nameOf, type Circle } from '../ajo'
 import { useWallet } from '../wallet'
 import { isProtectedCode, loadProtected } from '../protected'
 import { Avatar, ErrorNote, useAction, naira } from '../ui'
+import { savedName } from './NewCircle'
 
 export function Welcome({ route }: { route: string }) {
-  const { createLocal, connectFreighterWallet, importSecret } = useWallet()
+  const { createLocal, createPasskey, connectPasskey, connectFreighterWallet, importSecret } = useWallet()
   const { busy, error, run } = useAction()
   const [secret, setSecret] = useState('')
   const [invite, setInvite] = useState<Circle | null>(null)
@@ -31,25 +32,35 @@ export function Welcome({ route }: { route: string }) {
           Each contribution is locked for that round's recipient, so nobody can take the pot early or walk off with it.
         </p>
         <div className="actions">
-          <button className="btn btn-accent" disabled={!!busy} aria-busy={busy === 'local'} onClick={() => run('local', createLocal)}>
-            {busy === 'local' ? 'Setting up your wallet…' : 'Create a wallet'}
+          <button className="btn btn-accent" disabled={!!busy} aria-busy={busy === 'passkey'} onClick={() => run('passkey', () => createPasskey(savedName()))}>
+            {busy === 'passkey' ? 'Setting up your wallet…' : 'Create wallet with passkey'}
+          </button>
+          <button className="btn btn-ghost" disabled={!!busy} aria-busy={busy === 'signin'} onClick={() => run('signin', connectPasskey)}>
+            Sign in with passkey
           </button>
           <button className="btn btn-ghost" disabled={!!busy} aria-busy={busy === 'freighter'} onClick={() => run('freighter', connectFreighterWallet)}>
             Use Freighter
           </button>
         </div>
+        <p className="small muted" style={{ marginTop: 'var(--space-sm)' }}>
+          A passkey uses your phone's fingerprint, face or screen lock. No secret key to write down, and network fees are paid for you.
+          Passkey wallets use protected circles.
+        </p>
         <ErrorNote>{error}</ErrorNote>
         <details style={{ marginTop: 'var(--space-lg)' }}>
-          <summary>I already have a secret key</summary>
+          <summary>I already have a secret key, or want one</summary>
           <form className="actions" onSubmit={(e) => { e.preventDefault(); run('import', () => importSecret(secret)) }}>
             <label className="sr-only" htmlFor="secret">Secret key</label>
             <input id="secret" className="input mono" style={{ flex: '1 1 260px' }} placeholder="S…" autoComplete="off" spellCheck={false}
               value={secret} onChange={(e) => setSecret(e.target.value)} />
             <button className="btn btn-ghost" disabled={!secret || !!busy} aria-busy={busy === 'import'}>Import</button>
           </form>
+          <button className="linkish small" style={{ marginTop: 'var(--space-sm)' }} disabled={!!busy} onClick={() => run('local', createLocal)}>
+            {busy === 'local' ? 'Setting up your wallet…' : 'Or create a wallet with a new secret key'}
+          </button>
         </details>
         <p className="xs muted" style={{ marginTop: 'var(--space-lg)' }}>
-          Preview on Stellar testnet. New wallets get test XLM for fees, and the money here is test money.
+          Preview on Stellar testnet. Key wallets get test XLM for fees, and the money here is test money.
         </p>
       </div>
       <ol className="steps card">

@@ -47,6 +47,13 @@ Contract: see [contract/README.md](contract/README.md) (5 Rust tests, testnet de
 
 `.env.local` (not committed): `VITE_TREASURY`, `TREASURY_SECRET` (testnet treasury), optional `VITE_AJO_CONTRACT`, `VITE_USDC_SAC`.
 
+`CHANNELS_API_KEY` (server only, also set in Vercel): OpenZeppelin Channels testnet key from https://channels.openzeppelin.com/testnet/gen.
+It pays fees for passkey wallets through `api/relay.ts`, which only relays calls to the Ajo contract, the savings-USDC contract
+and passkey-wallet deployments (`node --experimental-strip-types scripts/relay-check.ts`). `VITE_NGN_RATE` sets the naira display rate (default 1500).
+
+Passkey wallets (passkey-kit) are smart-contract accounts: they use protected circles and need no XLM. Standard circles and anchor
+cash-out still need a key or Freighter wallet. `patches/` fixes a passkey-kit 0.20 bug where a signer with no expiry crashed sign-in.
+
 ## Honest limits
 
 - Testnet only. Demo "USDC" has a public issuer key so anyone can mint it; on mainnet use Circle's USDC.

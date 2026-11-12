@@ -2,8 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Keypair } from '@stellar/stellar-sdk'
 import { connectFreighter, discoverCodes, fundTestnet, getBalances, loadCircle, type Circle, type Signer } from './ajo'
 import { discoverProtected, isProtectedCode, loadProtected } from './protected'
+import { connectPasskeyWallet, createPasskeyWallet } from './passkey'
 
-export type Wallet = Signer & { kind: 'local' | 'freighter' }
+export type Wallet = Signer & { kind: 'local' | 'freighter' | 'passkey' }
 type Balances = Awaited<ReturnType<typeof getBalances>>
 
 const read = <T,>(key: string, fallback: T): T => {
@@ -20,6 +21,8 @@ type Ctx = {
   balances: Balances
   refreshBalances: () => void
   createLocal: () => Promise<void>
+  createPasskey: (name: string) => Promise<void>
+  connectPasskey: () => Promise<void>
   connectFreighterWallet: () => Promise<void>
   importSecret: (secret: string) => Promise<void>
   signOut: () => void
@@ -47,7 +50,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   // Rebuild the circle list from this wallet's ledger history, so a new device sees the same circles.
   useEffect(() => {
     if (!wallet) return
-    const all = Promise.all([discoverCodes(wallet.pub), discoverProtected(wallet.pub).catch(() => [] as string[])]).then(([a, b]) => [...a, ...b])
+    const all = Promise.all([wallet.keyId ? [] : discoverCodes(wallet.pub).catch(() => [] as string[]), discoverProtected(wallet.pub).catch(() => [] as string[])]).then(([a, b]) => [...a, ...b])
     all.then((found) => setCodes((prev) => {
       const next = [...prev, ...found.filter((c) => !prev.includes(c))]
       write(codesKey(wallet.pub), next)
@@ -62,6 +65,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       await fundTestnet(kp.publicKey())
       adopt({ kind: 'local', pub: kp.publicKey(), secret: kp.secret() })
     },
+    async createPasskey(name) { adopt({ kind: 'passkey', ...(await createPasskeyWallet(name)) }) },
+    async connectPasskey() { adopt({ kind: 'passkey', ...(await connectPasskeyWallet()) }) },
     async connectFreighterWallet() {
       const pub = await connectFreighter()
       await fundTestnet(pub)

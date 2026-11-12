@@ -1,5 +1,5 @@
 import { Buffer } from 'buffer'
-import { Asset, BASE_FEE, Claimant, Horizon, Keypair, Memo, Networks, Operation, TransactionBuilder, hash } from '@stellar/stellar-sdk'
+import { Asset, BASE_FEE, Claimant, Horizon, Keypair, Memo, Networks, Operation, StrKey, TransactionBuilder, contract, hash } from '@stellar/stellar-sdk'
 
 const freighter = () => import('@stellar/freighter-api') // lazy: only the browser needs it
 
@@ -8,7 +8,7 @@ export const NETWORK = Networks.TESTNET
 export const explorerTx = (h: string) => `https://stellar.expert/explorer/testnet/tx/${h}`
 export const explorerAccount = (a: string) => `https://stellar.expert/explorer/testnet/account/${a}`
 
-export type Signer = { pub: string; secret?: string }
+export type Signer = { pub: string; secret?: string; keyId?: string } // keyId: passkey wallet (C… address)
 
 const derive = (phrase: string) => Keypair.fromRawEd25519Seed(hash(Buffer.from(phrase)))
 
@@ -24,6 +24,7 @@ export const FEE_BPS = 50 // 0.5% of each payout
 export const feeOf = (total: number) => Math.round(total * FEE_BPS) / 10000
 
 export async function submit(who: Signer, ops: any[], memo?: string, cosigners: Keypair[] = []) {
+  if (who.keyId) throw new Error('Passkey wallets work with protected circles (codes starting with 1). This needs a key or Freighter wallet.')
   const tb = new TransactionBuilder(await server.loadAccount(who.pub), { fee: BASE_FEE, networkPassphrase: NETWORK })
   ops.forEach((o) => tb.addOperation(o))
   if (memo) tb.addMemo(Memo.text(memo))
@@ -48,6 +49,11 @@ export async function connectFreighter() {
   return a.address
 }
 
+const sac = (source: string, sign = false) => contract.Client.from({
+  contractId: USDC.contractId(NETWORK), networkPassphrase: NETWORK, rpcUrl: 'https://soroban-testnet.stellar.org', publicKey: source,
+  ...(sign ? { signTransaction: contract.basicNodeSigner(issuer, NETWORK).signTransaction } : {}),
+}) as Promise<any>
+
 const exists = (pub: string) => server.loadAccount(pub).then(() => true, () => false)
 
 export async function fundTestnet(pub: string) {
@@ -57,6 +63,10 @@ export async function fundTestnet(pub: string) {
 }
 
 export async function getBalances(pub: string) {
+  if (StrKey.isValidContract(pub)) { // passkey wallet: read the savings-USDC contract; fees are sponsored, so no XLM
+    const r = await sac(issuer.publicKey()).then((c) => c.balance({ id: pub }))
+    return { usdc: Number(r.result) / 1e7, xlm: 0, trusted: true }
+  }
   const acc = await server.loadAccount(pub).catch(() => null)
   if (!acc) return null
   const u: any = acc.balances.find((b: any) => b.asset_code === 'USDC' && b.asset_issuer === USDC.issuer)
@@ -66,6 +76,10 @@ export async function getBalances(pub: string) {
 
 export async function getTestUsdc(me: Signer, amount = '500') {
   await fundTestnet(issuer.publicKey())
+  if (me.keyId) { // contract wallets have no trustlines; the issuer mints straight to them through the asset contract
+    const tx = await (await sac(issuer.publicKey(), true)).mint({ to: me.pub, amount: BigInt(Number(amount) * 1e7) })
+    return (await tx.signAndSend()).result
+  }
   const b = await getBalances(me.pub)
   if (!b?.trusted) await submit(me, [Operation.changeTrust({ asset: USDC })])
   const pay = () => submit({ pub: issuer.publicKey(), secret: issuer.secret() }, [Operation.payment({ destination: me.pub, asset: USDC, amount })])

@@ -1,5 +1,6 @@
 import { Keypair, contract } from '@stellar/stellar-sdk'
-import { NETWORK, type Circle, type Freq, type Signer } from './ajo.ts'
+import { NETWORK, issuer, type Circle, type Freq, type Signer } from './ajo.ts'
+import { signAndRelay } from './passkey.ts'
 
 // Protected circles live in the Ajo Soroban contract (contract/): deposits, default cover and early-payout bids.
 const env = (import.meta as any).env ?? {}
@@ -37,7 +38,8 @@ function client(me?: Signer): Promise<any> {
   if (!clients.has(key)) {
     clients.set(key, contract.Client.from({
       contractId: AJO_CONTRACT, networkPassphrase: NETWORK, rpcUrl: RPC_URL,
-      ...(me ? { publicKey: me.pub, signTransaction: signer(me) } : {}),
+      // A passkey wallet is a contract and cannot source transactions; simulate from a funded account, the relayer pays.
+      ...(me?.keyId ? { publicKey: issuer.publicKey() } : me ? { publicKey: me.pub, signTransaction: signer(me) } : {}),
     }).catch((e) => { clients.delete(key); throw e }))
   }
   return clients.get(key)!
@@ -45,6 +47,7 @@ function client(me?: Signer): Promise<any> {
 
 async function send(me: Signer, method: string, args: Record<string, unknown>) {
   const tx = await (await client(me))[method](args)
+  if (me.keyId) return signAndRelay(me, tx)
   const sent = await tx.signAndSend()
   return sent.result
 }

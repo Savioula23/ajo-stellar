@@ -24,7 +24,7 @@ export function useAction() {
   const [error, setError] = useState('')
   const run = async (label: string, fn: () => Promise<unknown>) => {
     setBusy(label); setError('')
-    try { await fn() } catch (e) { setError(friendlyError(e)) } finally { setBusy('') }
+    try { await fn() } catch (e) { console.error(e); setError(friendlyError(e)) } finally { setBusy('') }
   }
   return { busy, error, run, setError }
 }

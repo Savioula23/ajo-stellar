@@ -23,8 +23,22 @@ const step = (msg: string) => console.log(`· ${msg}`)
 const shot = (p: Page, name: string) => (SHOTS ? p.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true }) : Promise.resolve())
 
 async function newWallet(p: Page) {
-  await p.getByRole('button', { name: 'Create a wallet' }).click()
+  await p.getByText('I already have a secret key, or want one').click()
+  await p.getByRole('button', { name: 'Or create a wallet with a new secret key' }).click()
   await p.getByRole('link', { name: 'Wallet', exact: true }).waitFor({ timeout: T })
+}
+// A simulated fingerprint reader, so the passkey prompts complete on their own.
+async function passkeyWallet(p: Page) {
+  const cdp = await p.context().newCDPSession(p)
+  await cdp.send('WebAuthn.enable')
+  await cdp.send('WebAuthn.addVirtualAuthenticator', { options: {
+    protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true,
+  } })
+  await p.getByRole('button', { name: 'Create wallet with passkey' }).click()
+  await Promise.race([
+    p.getByRole('link', { name: 'Wallet', exact: true }).waitFor({ timeout: T }),
+    p.locator('.error').waitFor({ timeout: T }).then(async () => { throw new Error('App error: ' + await p.locator('.error').innerText()) }),
+  ])
 }
 async function mint(p: Page) {
   await p.goto(BASE + '#/wallet')
@@ -33,10 +47,12 @@ async function mint(p: Page) {
 }
 
 try {
-  step('Ada creates a wallet, mints USDC and starts a circle')
+  step('Ada signs up with a passkey (fees sponsored), mints test money and starts a circle')
   const ada = await person()
+  ada.on('console', (m) => { if (m.type() === 'error') console.log('  browser:', m.text()) })
   await ada.goto(BASE)
-  await newWallet(ada)
+  await passkeyWallet(ada)
+  assert.match(await ada.evaluate(() => JSON.parse(localStorage.getItem('ajo-wallet-v2')!).pub), /^C/)
   await mint(ada)
   await ada.goto(BASE + '#/new')
   await ada.getByRole('radio', { name: 'Protected' }).check()
@@ -85,7 +101,7 @@ try {
   await ada.goto(BASE + '#/wallet')
   await ada.locator('.balance', { hasText: '₦765,000' }).waitFor({ timeout: T })
   await shot(ada, 'wallet-after-payout')
-  step('Contract paid Ada 20 USDC; balance ₦765,000 = 750k - 15k deposit + 30k pot')
+  step('Contract paid the passkey wallet 20 USDC; balance ₦765,000 = 750k - 15k deposit + 30k pot')
 
   const score = await person()
   await score.goto(`${BASE}#/score/${await ada.evaluate(() => JSON.parse(localStorage.getItem('ajo-wallet-v2')!).pub)}`)
